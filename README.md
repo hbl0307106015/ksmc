@@ -1,2 +1,2 @@
 # ksmc
-KNX Smart Controller
+Smart Controller
