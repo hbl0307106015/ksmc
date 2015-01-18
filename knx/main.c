@@ -1,54 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <unistd.h>
+#include "knxCommon.h"
+#include "knxProtocol.h"
+#include "log.h"
 
-#include <errno.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+bool gEnableRssi = false;
+uint8_t gNetworkRole = 0;
 
-#include <termios.h>
-#include <fcntl.h>
+extern char *optarg;
 
-
-/* Macro */
 #define VERSION_STR "0.0.2"
-
-#define GET_OFFSET_RECV_C(b) (b + 0)
-#define GET_OFFSET_RECV_HEADER(b) (b + 1)
-#define GET_OFFSET_RECV_RF_INFO(b) (b + 2)
-#define GET_OFFSET_RECV_KNX_CTRL(b) (b + 9)
-//get the offset of TX serial number of Domain Address
-#define GET_OFFSET_RECV_TXSN_OR_DA(b) (b + 3)
-#define GET_OFFSET_RECV_APPL_HEADER(b) (b + 10)
-#define GET_OFFSET_RECV_SRC(b) GET_OFFSET_RECV_APPL_HEADER(b)
-#define GET_OFFSET_RECV_APPL_DATA (b + 17)
-
-#define LENGTH_BEFORE_APPL_DATA 17
-
-enum {
-	FORMAT_STRING = 0,
-	FORMAT_HEX = 1,
-};
-
-
-/* Function */
-
-/*
- * dump_buffer
- * @b	: buffer
- * @len	: length of buffer
- * */
-static void dump_buffer(unsigned char *b, size_t len);
-
-/*
- * dump_buffer_appl_data
- * @b	: buffer
- * @len	: length of buffer
- * @flag: format of the dump function, hex or string ?
- * */
-static void dump_buffer_appl_data(unsigned char *b, size_t len, uint8_t flag);
 
 static void show_version(void)
 {
@@ -59,7 +18,6 @@ static void show_version(void)
 		"Copyright (c) 2014, VIA Networking "
 		"and contributors\n");
 }
-
 
 static void usage(void)
 {
@@ -81,22 +39,103 @@ static void usage(void)
 	exit(1);
 }
 
+static speed_t transfer_baud_rate(uint16_t int_baud_rate)
+{
+	switch(int_baud_rate)
+	{
+		case 9600:
+			return B9600;
+			break;
+		case 19200:
+			return B19200;
+			break;
+		default:
+			return B115200;
+			break;
+	}
+}
+
+static void program_init(char **dev,
+                 speed_t *spd,
+                 bool *rssi,
+                 uint8_t *role)
+{
+    (*dev) = "/dev/ttyUSB0";
+    //strcpy(*dev, "/dev/ttyUSB0");
+    (*spd) = B19200;
+    (*rssi) = true;
+    (*role) = ROLE_TRANSMITTER_RECEIVER;
+}
+
 int main(int argc, char *argv[])
 {
     int r = 0;
     int tty_fd = 0;
     struct termios to, new_to;
 
+	#if 0
 	if (argc != 3) {
 		printf("Usage: <program> <tty device> <role:0 or 1>\n"
 			"\texample: ./smc /dev/ttyUSB0 1\n");
 		exit(1);
 	}
-	
+
     char *dev = argv[1];
     int role = atoi(argv[2]);
     printf("target device (%s) (%s)\n", dev, role ? ("sender") : ("receiver"));
-    
+   	#endif
+   	
+	int c;
+	char *dev = NULL;
+	speed_t spd_baud_rate;
+	uint16_t int_baud_rate;
+
+    program_init(&dev,
+                 &spd_baud_rate,
+                 &gEnableRssi,
+                 &gNetworkRole);
+
+	for (;;) {
+		c = getopt(argc, argv, "b:d:hr:sv");
+		if (c < 0)
+			break;
+		switch (c) {
+		case 'h':
+			usage();
+			break;
+		case 'b':
+			int_baud_rate = atoi(optarg);
+			spd_baud_rate = transfer_baud_rate(int_baud_rate);
+			break;
+		case 'd':
+			dev = optarg;
+			break;
+		case 'r':
+			gNetworkRole = atoi(optarg);
+			break;
+		case 's':
+			gEnableRssi = true;
+			break;
+		case 'v':
+			show_version();
+			exit(1);
+			break;
+		default:
+			usage();
+			break;
+		}
+	}
+	
+	fprintf(stdout, "show option parameters' value\n"
+		"baud_rate: %u\n"
+		"device node: %s\n"
+		"enable rssi: %u\n"
+		"network role: %u\n",
+		spd_baud_rate,
+		dev,
+		gEnableRssi,
+		gNetworkRole);
+
     tty_fd = open(dev, O_RDWR|O_NOCTTY|O_NDELAY);
 	if (tty_fd < 0) {
 		perror("open file");
@@ -108,8 +147,8 @@ int main(int argc, char *argv[])
     tcgetattr(tty_fd, &to);
     speed_t sp_o = cfgetospeed(&to);
     speed_t sp_i = cfgetispeed(&to);
-    printf("output baud rate output is B9600: %d\n", sp_o & B9600);
-    printf("input baud rate input is B9600: %d\n", sp_i & B9600);
+    printf("output baud rate output is %d ?: %d\n", spd_baud_rate, sp_o == spd_baud_rate);
+    printf("input baud rate input is %d ? : %d\n", spd_baud_rate, sp_i == spd_baud_rate);
     printf("data bit: %d\n", (to.c_cflag) & CS8);
     printf("stop bit: %d\n", (to.c_cflag) & CSTOPB);
     printf("parity 1 bit: %d\n", (to.c_cflag) & PARENB);
@@ -121,6 +160,7 @@ int main(int argc, char *argv[])
 	printf("vtime & VMIN %d %d\n", to.c_cc[VTIME], to.c_cc[VMIN]);
 
 	/* config new termios struct and apply it */
+	#if 0
     memset(&new_to, 0, sizeof(new_to));
     new_to.c_cflag |= (CLOCAL | CREAD); /* Ignore modem control lines, enable receiver */
     new_to.c_cflag &= (~CSIZE); /*Clear character size mask.  Values are CS5, CS6, CS7, or CS8. */
@@ -146,7 +186,8 @@ int main(int argc, char *argv[])
         perror("tcsetattr error");
         exit(1);
     }
-
+	#endif
+	
 	/* restore the status of UART device, i.e. to the block-status(default) */
 	if (fcntl(tty_fd, F_SETFL, 0) < 0) {
 		perror("fcntl set flag");
@@ -184,7 +225,7 @@ int main(int argc, char *argv[])
 	fd_set tty_set;
     bool running = true;
     int frame_length = 0, rssi_enable = 1, failed = 0;
-    int maxDescriptor = tty_fd + 1, bytes_read = 1, \
+    int maxDescriptor = tty_fd + 1, \
 		actual_len = 0, finished = 0, nr = 0;
     
     while (running) {
@@ -192,7 +233,7 @@ int main(int argc, char *argv[])
 		FD_ZERO(&tty_set);
 		FD_SET(tty_fd, &tty_set);
 
-        if (role) {
+        if (gNetworkRole) {
             printf("try to write data, result:");
             r = write(tty_fd, buffer, 21);
             printf("r = %d bytes\n", r);
@@ -243,43 +284,15 @@ int main(int argc, char *argv[])
 				#endif
 				
 				
-				#if 0
-				r = read(tty_fd, buffer_r, 1); /* read the first byte which indicate the length of the data frame */
-				//usleep(900);
-				printf("r = %d content 1st %02x\n", r, buffer_r[0]);
-				
-				if (!r)
-					continue;
-
-				frame_len = buffer_r[0];
-				printf("len = %02x ", frame_len);
-				
-				if (frame_len == 0) {// for the case '00 27'
-					r = read(tty_fd, buffer_r, 1); // clear the data frame buffer
-					if (r)
-						printf("r = %d data = %02x", r, buffer_r[0]);
-				} else {
-					usleep(180 + (1800 * (frame_len)) + 900); // wait delay time
-					r = read(tty_fd, buffer_r, frame_len);
-					printf("r = %d data =", r);
-					for (i = 0; i < r; i++)
-						printf("%02x ", buffer_r[i]);
-				}
-				printf("\n");
-				//sleep(1);
-				#endif
-				
-				
 			} /* FD is set */
 			#if 1
 			if (finished) {
 				//bytes_read = 0;
 				//dump_buffer(buffer_r, frame_length);
-				dump_buffer_appl_data(buffer_r, frame_length, FORMAT_STRING);
+				dump_buffer_appl_data(buffer_r, frame_length, DUMP_FORMAT_STRING);
 				finished = 0;
 			}
 			#endif
-				
 			
         } /* role == 0 */
         
@@ -287,42 +300,4 @@ int main(int argc, char *argv[])
 
     close(tty_fd);
     return 0;
-}
-
-static void dump_buffer(unsigned char *b, size_t len)
-{
-	if (len <=0)
-		return;
-
-	uint32_t i;
-	
-	fprintf(stdout, "buffer: ");
-	for (i = 0; i < len; i++)
-		fprintf(stdout, "%02x ", b[i]);
-	fprintf(stdout, "\n");
-}
-
-static void dump_buffer_appl_data(unsigned char *b, size_t len, uint8_t flag)
-{
-	if (len < LENGTH_BEFORE_APPL_DATA)
-		return;
-		
-	fprintf(stdout, "application data: ");
-	
-	if (flag == FORMAT_HEX)
-		return dump_buffer(b, len);
-	
-	uint32_t actual_len = len - LENGTH_BEFORE_APPL_DATA;
-	char *p = (char *)malloc(actual_len + 1);
-	
-	if (!p) {
-		perror("out of memory");
-		exit(1);
-	}
-	
-	memcpy(p, b + LENGTH_BEFORE_APPL_DATA, actual_len);
-	p[actual_len] = '\0';
-	fprintf(stdout, "%s\n", p);
-	
-	free(p);
 }
