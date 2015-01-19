@@ -7,7 +7,7 @@ void dump_buffer(unsigned char *b, size_t len)
 	if (len <=0)
 		return;
 
-	uint32_t i;
+	uint16_t i;
 	
 	fprintf(stdout, "buffer: ");
 	for (i = 0; i < len; i++)
@@ -22,10 +22,13 @@ void dump_buffer_appl_data(unsigned char *b, size_t len, uint8_t flag)
 		
 	fprintf(stdout, "application data: ");
 	
-	if (flag == DUMP_FORMAT_HEX)
-		return dump_buffer(b, len);
+	if (flag == DUMP_FORMAT_HEX) {
+		dump_buffer(b, len);
+		return;
+	}
 	
-	uint32_t actual_len = len - LENGTH_BEFORE_APPL_DATA;
+	uint16_t actual_len = get_user_data_length(len);
+
 	char *p = (char *)malloc(actual_len + 1);
 	
 	if (!p) {

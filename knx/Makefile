@@ -1,20 +1,20 @@
 # This Makefile is for KNX
-#
+# VIA Networking <2014.12>
 
 CC=gcc
-CFLAGS=-Wall
+CFLAGS=-Wall -W -pedantic -std=c99 -DUSE_POSIX=1
 LDFLAGS=
-INCLUDES=
+INCLUDES=-L.
 
 TARGET=knx
 SOURCE_FILES=$(wildcard *.c)
 OBJECT_FILES=$(patsubst %.c,%.o,$(SOURCE_FILES))
 
-%.o : %.c
-	$(CC) -c $(CFLAGS) $< -o $@
-
-#%.o : %.c %.h
+#%.o : %.c
 #	$(CC) -c $(CFLAGS) $< -o $@
+
+%.o : %.c %.h
+	$(CC) -c $(CFLAGS) $< -o $@
 
 $(TARGET) : $(OBJECT_FILES)
 	$(CC) $^ -o $@ $(INCLUDES) $(LDFLAGS)
@@ -22,4 +22,3 @@ $(TARGET) : $(OBJECT_FILES)
 .PHONY : clean
 clean:
 	$(RM) $(TARGET) $(OBJECT_FILES)
-
