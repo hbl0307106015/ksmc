@@ -17,6 +17,9 @@ extern int sigemptyset(sigset_t *s);
 /* marcos */
 #define VERSION_STR "0.0.2"
 
+void* handle_knx_tty(void *arg);
+void* handle_socket(void *arg);
+
 /* show the program's version */
 static void show_version(void)
 {
