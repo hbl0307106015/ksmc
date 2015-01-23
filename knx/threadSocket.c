@@ -53,6 +53,17 @@ void* handle_socket(void *arg)
 	socklen_t fromAddrLen = sizeof(fromAddr); // source address of server
 	char buffer[MAX_STRING_LENGTH + 1] = {0}; // I/O buffer
 
+	int flags = fcntl(sock, F_GETFL, 0);
+	if (flags < 0) {
+		perror("fcntl fet flags error");
+		pthread_exit(NULL);
+	}
+	
+	if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
+		perror("fcntl fet flags error");
+		pthread_exit(NULL);
+	}
+
     #if 1
     do {
 
@@ -61,11 +72,11 @@ void* handle_socket(void *arg)
 
 		if (numBytes < 0) {
 			perror("socket thread, numBytes < 0");
-			pthread_exit(NULL);
+			//pthread_exit(NULL);
 		}
 		else if (numBytes != eStrLen) {
 			perror("socket thread, numBytes != eStrLen");
-			pthread_exit(NULL);
+			//pthread_exit(NULL);
 		}
 
 		fputs("it has been sent a message, waiting for response", stdout);
@@ -75,11 +86,11 @@ void* handle_socket(void *arg)
 			(struct sockaddr *)&fromAddr, &fromAddrLen);
 		if (numBytes < 0) {
 			perror("socket thread, numBytes recv < 0");
-			pthread_exit(NULL);
+			//pthread_exit(NULL);
 		}
 		else if (numBytes != eStrLen) {
 			perror("socket thread, numBytes recv != sStrlen");
-			pthread_exit(NULL);
+			//pthread_exit(NULL);
 		}
 		
 		// verfication 
