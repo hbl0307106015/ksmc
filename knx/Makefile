@@ -2,9 +2,9 @@
 # VIA Networking <2014.12>
 
 CC=gcc
-CFLAGS=-Wall -W -pedantic -std=c99 -DUSE_POSIX=1
-LDFLAGS=
-INCLUDES=-L.
+CFLAGS=-Wall -W -O -DUSE_POSIX=1
+LDFLAGS=-lpthread
+INCLUDES=-I.
 
 TARGET=knx
 SOURCE_FILES=$(wildcard *.c)
@@ -14,10 +14,10 @@ OBJECT_FILES=$(patsubst %.c,%.o,$(SOURCE_FILES))
 #	$(CC) -c $(CFLAGS) $< -o $@
 
 %.o : %.c %.h
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(TARGET) : $(OBJECT_FILES)
-	$(CC) $^ -o $@ $(INCLUDES) $(LDFLAGS)
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 .PHONY : clean
 clean:

@@ -11,18 +11,25 @@
 #include <string.h>
 #include <signal.h>
 
+/*
 #if defined(USE_POSIX)
-#include <bits/sigaction.h> /* for struct sigaction */
+#include <bits/sigaction.h> // for struct sigaction
 #endif
+*/
 
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include <termios.h>
 #include <fcntl.h>
 
+#include <pthread.h>
+
 extern bool gEnableRssi;
+extern bool gFlagExit;
 extern uint8_t gNetworkRole;
 
 #if (defined __USE_XOPEN_EXTENDED && !defined __USE_XOPEN2K8) \

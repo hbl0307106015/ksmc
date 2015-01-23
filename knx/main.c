@@ -1,6 +1,12 @@
 #include "knxCommon.h"
 #include "knxProtocol.h"
+#include "threadKnxTty.h"
+#include "threadSocket.h"
 #include "log.h"
+
+/* marcos */
+#define VERSION_STR "0.0.2"
+#define KNX_THREAD_NUM 2
 
 /* global variables */
 bool gEnableRssi = false;
@@ -8,14 +14,15 @@ bool gFlagExit = false;
 uint8_t gNetworkRole = 0;
 uint16_t gTxInterval = 0;
 
+pthread_t thread_manager[KNX_THREAD_NUM];
+
 /* global function declaration */
+#if 0
 extern char *optarg;
 extern int getopt(int argc, char * const argv[], const char *optstring);
 extern int sigaction(int s, __const struct sigaction *sg, struct sigaction *osg);
 extern int sigemptyset(sigset_t *s);
-
-/* marcos */
-#define VERSION_STR "0.0.2"
+#endif
 
 void* handle_knx_tty(void *arg);
 void* handle_socket(void *arg);
@@ -37,7 +44,7 @@ static void usage(void)
 	show_version();
 	fprintf(stderr,
 		"\n"
-		"usage: smc [-hs] [-b <baud rate>] [-d <device node file>] [-r <role>]"
+		"usage: knx [-hs] [-b <baud rate>] [-d <device node file>] [-r <role>]"
 		"\\\n"
 		"\n"
 		"options:\n"
@@ -45,6 +52,7 @@ static void usage(void)
 		"   -b   baud rate\n"
 		"   -d   device node file (e.g. /dev/ttyS0, /dev/ttyUSB2)\n"
 		"   -r   work role (0:transmitter, 1:receiver, 2:repeater)\n"
+		"   -p   server port/service (the server address/Name is fixed as localhost=127.0.0.1)\n"
 		"   -s   enable rssi information (only effective under role of receiver)\n"
 		"   -B   run daemon in the background (not support yet, comming soon...)\n"
 		"   -v   show program version\n");
@@ -56,34 +64,51 @@ static void usage(void)
 static void program_init(char **dev,
                  speed_t *spd,
                  bool *rssi,
-                 uint8_t *role)
+                 uint8_t *role,
+                 char **p)
 {
     (*dev) = "/dev/ttyUSB0";
     (*spd) = B19200;
     (*rssi) = false;
     (*role) = ROLE_TRANSMITTER_RECEIVER;
+    (*p) = "echo";
+    
+    int i;
+    for (i = 0; i < KNX_THREAD_NUM; i++)
+		memset(&(thread_manager[i]), 0, sizeof(pthread_t));
 }
 
 static void sighandler(int signum)
 {
+	fprintf(stdout, "got %d signum\n", signum);
 	gFlagExit = true;
+	
+	#if 0
+	int i;
+	for (i = 0; i < KNX_THREAD_NUM; i++) {
+		if (thread_manager[i] > 0)
+			pthread_kill(thread_manager[i], SIGINT);
+	}
+	#endif
 }
 
 int main(int argc, char *argv[])
 {
     int ret = 0;
 	char *dev = NULL;
+	char *port = NULL;
 	speed_t spd_baud_rate;
 	uint16_t int_baud_rate;
 
     program_init(&dev,
                  &spd_baud_rate,
                  &gEnableRssi,
-                 &gNetworkRole);
+                 &gNetworkRole,
+                 &port);
 
 	int c = 0;
 	for (;;) {
-		c = getopt(argc, argv, "b:d:hr:sv");
+		c = getopt(argc, argv, "b:d:hp:r:sv");
 		if (c < 0)
 			break;
 		switch (c) {
@@ -99,6 +124,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			gNetworkRole = atoi(optarg);
+			break;
+		case 'p':
+			port = optarg;
 			break;
 		case 's':
 			gEnableRssi = true;
@@ -118,10 +146,12 @@ int main(int argc, char *argv[])
 		"device node: %s\n"
 		"enable rssi: %u\n"
 		"network role: %u\n",
+		//"port number: %s\n",
 		spd_baud_rate,
 		dev,
 		gEnableRssi,
 		gNetworkRole);
+		//port);
 
 	int tty_fd = open(dev, O_RDWR|O_NOCTTY|O_NDELAY);
 	if (tty_fd < 0) {
@@ -155,97 +185,37 @@ int main(int argc, char *argv[])
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGQUIT, &sigact, NULL);
 
-    /*
-     * below is the example for transmit frame format, 1st byte is length(not including itseldf).
-	 * char buffer[64] = {0xb, 0x0, 0x0, 0x1, 0x0, 0x2, 0x61, 0x0, 0x0, 0xaa, 0xbb, 0xcc, 0xff};
-     */
-    
-    unsigned char buffer[RC1180_MAX_BUFFER_SIZE] = {
-		0x14, 0x0,\
-		0x0, 0x1, 0x0, 0x2, 0x61, 0x0, 0x0, \
-		'h', 'e', 'l', 'l', 'o', ',', 'w', 'o', 'r', 'l', 'd','!'};
-    unsigned char buffer_r[RC1180_MAX_BUFFER_SIZE] = {0};
-    
-    int i;
-    for (i = 0; i < 22; i++)
-		printf("%02x ", buffer[i]);
-	printf("\n");
-    
-	fd_set tty_set;
-    //bool running = true;
-    int frame_length = 0, failed = 0;
-    int maxDescriptor = tty_fd + 1, \
-		actual_len = 0, finished = 0, nr = 0;
-    
-    while (gFlagExit != true) {
 
-		FD_ZERO(&tty_set);
-		FD_SET(tty_fd, &tty_set);
-
-        if (gNetworkRole) {
-            printf("try to write data, result:");
-            ret = write(tty_fd, buffer, 21);
-            printf("r = %d bytes\n", ret);
-            sleep(3);
-        } else {
-            //printf("try to read data, result:");
-			if (select(maxDescriptor, &tty_set, NULL, NULL, NULL) <= 0)
-				continue;
-
-			if (FD_ISSET(tty_fd, &tty_set)) {
-
-				/*
-				 * read 1 bytes at first, and then the bytes_read 
-				 * will be modified by the actual status. 
-				*/
-				actual_len = read(tty_fd, buffer_r, 1);
-				
-				if (actual_len == 0)
-					continue;
-
-				frame_length = buffer_r[0];
-				gTxInterval = transfer_wait_time(spd_baud_rate, frame_length);
-
-				if (actual_len == 1) {
-					fprintf(stdout, "frame_length ?= %02x ", frame_length);
-					if (frame_length == 0x0) {
-						if (gEnableRssi) {
-							//usleep(180 + 1770 + 900); /* 1770 = 590 * 3 */
-							usleep(gTxInterval);
-							read(tty_fd, buffer_r, 1);
-						}
-						fprintf(stdout, "\n");
-					} else {
-						usleep(gTxInterval);
-						//usleep((unsigned int)(180 + (590 * 3 * frame_length) + 900));
-						actual_len = read(tty_fd, buffer_r, frame_length);
-						fprintf(stdout, "NO = %d, actual_length := %02x ", (++nr), actual_len);
-						if (frame_length == actual_len)
-							finished = 1;
-						else {
-							failed++;
-							dump_buffer(buffer_r, actual_len);
-							fprintf(stdout, "\n");
-						}
-					}
-				} else {
-					fprintf(stderr, "unknown data: ");
-					dump_buffer(buffer_r, actual_len);
-				}
-				
-			} /* FD is set */
-
-			if (finished) {
-				//dump_buffer(buffer_r, frame_length);
-				dump_buffer_appl_data(buffer_r, frame_length, DUMP_FORMAT_STRING);
-				finished = 0;
-			}
-			
-        } /* role == 0 */
-        
-    } /* while (running) */
-
-    fprintf(stderr, "shuting down...\n");
+	pthread_t tkt;
+	struct thread_knx_arg tkp;
+	tkp.fd = tty_fd;
+	tkp.baud_rate = spd_baud_rate;
+	ret = pthread_create(&tkt, NULL, handle_knx_tty, (void *)&tkp);
+	if (ret != 0) {
+		fprintf(stderr, "thread knx failed...\n");
+		exit(1);
+	}
+	thread_manager[0] = tkt;
+	
+	#if 1
+	pthread_t tsk;
+	struct thread_socket_arg tsp;
+	tsp.server = DEFAULT_SERVER_ADDRESS;
+	tsp.port = port;
+	ret = pthread_create(&tsk, NULL, handle_socket, (void *)&tsp);
+	if (ret != 0) {
+		fprintf(stderr, "thread socket failed...\n");
+		exit(1);
+	}
+	thread_manager[1] = tsk;
+	#endif
+	
+	fprintf(stdout, "knx UART thread:%u\n", ((unsigned int)tkt));
+	fprintf(stdout, "socket thread:%u\n", ((unsigned int)tsk));
+	
+	pthread_join(tkt, NULL);
+	pthread_join(tsk, NULL);
+    fprintf(stdout, "shuting down smc...\n");
 
 out:
 	if (tty_fd >= 0)
