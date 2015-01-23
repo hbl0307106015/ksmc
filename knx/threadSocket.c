@@ -3,6 +3,9 @@
 #include "log.h"
 #include "threadSocket.h"
 
+#define MAX_NUM_FILES_DES 2
+#define POLL_TIME_OUT_MS 500
+
 static inline bool is_sock_addr_equal()
 {
 	return true;
@@ -31,7 +34,7 @@ void* handle_socket(void *arg)
 		&addrCriteria, &servAddr);
 	if (ret != 0) {
 		perror("socket thread, getaddrinfo()");
-		pthread_exit(NULL);
+		goto out;
 	}
 	
 	// create a datagram/UDP socket
@@ -39,7 +42,7 @@ void* handle_socket(void *arg)
 		servAddr->ai_protocol);
 	if (sock < 0) {
 		perror("socket thread, socket()");
-		pthread_exit(NULL);
+		goto out;
 	}
 	
 	fputs("create thread socket successfully\n", stdout);
@@ -53,60 +56,79 @@ void* handle_socket(void *arg)
 	socklen_t fromAddrLen = sizeof(fromAddr); // source address of server
 	char buffer[MAX_STRING_LENGTH + 1] = {0}; // I/O buffer
 
+	#if 0
 	int flags = fcntl(sock, F_GETFL, 0);
 	if (flags < 0) {
 		perror("fcntl fet flags error");
-		pthread_exit(NULL);
+		goto out;
 	}
-	
+
 	if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
 		perror("fcntl fet flags error");
-		pthread_exit(NULL);
+		goto out;
 	}
+	#endif
+	
+	struct pollfd fds[MAX_NUM_FILES_DES];
+	fds[0].fd = sock; // add socket file descriptor
+	fds[0].events = POLLIN|POLLRDNORM;//|POLLOUT|POLLWRNORM; //register pollin & pollout event
+	fds[1].fd = sock; // add socket file descriptor
+	fds[1].events = POLLOUT|POLLWRNORM; //register pollin & pollout event
 
-    #if 1
     do {
-
-		numBytes = sendto(sock, echoString, eStrLen, 0, \
-			servAddr->ai_addr, servAddr->ai_addrlen);
-
-		if (numBytes < 0) {
-			perror("socket thread, numBytes < 0");
-			//pthread_exit(NULL);
+		
+		if (poll(fds, MAX_NUM_FILES_DES, POLL_TIME_OUT_MS) <= 0) {
+			perror("no data available");
+			sleep(1);
+			continue;
 		}
-		else if (numBytes != eStrLen) {
-			perror("socket thread, numBytes != eStrLen");
-			//pthread_exit(NULL);
+		
+		if ((fds[1].revents && POLLOUT)||(fds[1].revents && POLLWRNORM)) {
+			fputs("pollout available\n", stdout);
+			numBytes = sendto(sock, echoString, eStrLen, 0, \
+				servAddr->ai_addr, servAddr->ai_addrlen);
+
+			if (numBytes < 0) {
+				perror("socket thread, numBytes < 0");
+				//pthread_exit(NULL);
+			}
+			else if (numBytes != eStrLen) {
+				perror("socket thread, numBytes != eStrLen");
+				//pthread_exit(NULL);
+			}
+			sleep(1);
+			fputs("pollout done\n", stdout);
 		}
 
-		fputs("it has been sent a message, waiting for response", stdout);
+		fputs("it has been sent a message, waiting for response\n", stdout);
 
 		// received a response
-		numBytes = recvfrom(sock, buffer, MAX_STRING_LENGTH, 0, \
-			(struct sockaddr *)&fromAddr, &fromAddrLen);
-		if (numBytes < 0) {
-			perror("socket thread, numBytes recv < 0");
-			//pthread_exit(NULL);
-		}
-		else if (numBytes != eStrLen) {
-			perror("socket thread, numBytes recv != sStrlen");
-			//pthread_exit(NULL);
-		}
+		if ((fds[0].revents && POLLIN) || (fds[0].revents && POLLRDNORM)) {
+			fputs("pollin available\n", stdout);
+			numBytes = recvfrom(sock, buffer, MAX_STRING_LENGTH, 0, \
+				(struct sockaddr *)&fromAddr, &fromAddrLen);
+			if (numBytes < 0) {
+				perror("socket thread, numBytes recv < 0");
+				//pthread_exit(NULL);
+			}
+			else if (numBytes != eStrLen) {
+				perror("socket thread, numBytes recv != sStrlen");
+				//pthread_exit(NULL);
+			}
+				// verfication 
+			if (!is_sock_addr_equal(servAddr->ai_addr, (struct sockaddr *)&fromAddr))
+				perror("socket thread, addr is not equal with the previous server");
 		
-		// verfication 
-		if (!is_sock_addr_equal(servAddr->ai_addr, (struct sockaddr *)&fromAddr))
-			perror("socket thread, addr is not equal with the previous server");
-		
-		buffer[eStrLen] = '\0'; // Null terminate received data
-		fprintf(stdout, "received:%s.\n", buffer); // Print the data buffer
-
-		sleep(1);
-
+			buffer[eStrLen] = '\0'; // Null terminate received data
+			fprintf(stdout, "received:%s.\n", buffer); // Print the data buffer
+		}
     } while (gFlagExit != true); /* while (running) */
-    #endif
 	
+out:
 	fprintf(stdout, "thread %u is going to shutdown\n",  ((unsigned int)pthread_self()));
+	fflush(stdout);
+	fflush(stderr);
 	freeaddrinfo(servAddr);
 	close(sock);
-    return (void *)NULL;
+    return ((void *)NULL);
 }
