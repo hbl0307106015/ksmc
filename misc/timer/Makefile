@@ -2,7 +2,7 @@
 # VIA Networking <2015.1>
 
 CC=gcc
-CFLAGS=-Wall -W -O
+CFLAGS=-Wall -W -O -g
 LDFLAGS=
 INCLUDES=-I.
 
@@ -14,7 +14,7 @@ OBJECT_FILES=$(patsubst %.c,%.o,$(SOURCE_FILES))
 	$(CC) $(CLFAGS) $(INCLUDES) -c $< -o $@
 
 $(TARGET) : $(OBJECT_FILES)
-	$(CC) $^ -o $@ (LDFALGS)
+	$(CC) $^ -o $@ $(LDFALGS)
 
 .PHONY:clean
 clean:

@@ -1,5 +1,5 @@
-#ifndef TIMER_H
-#define TIMER_H
+#ifndef MYTIMER_H
+#define MYTIMER_H
 
 #include<time.h>
 #include"common.h"
@@ -10,12 +10,9 @@ struct mytimer {
 	struct client_data *user_data;
 };
 
-mytimer gTimer;
+extern struct mytimer **gTimer;
 
-void mytimer_init(int delay);
-{
-	gTimer.expire = time(NULL) + delay;
-}
+void mytimer_init(struct mytimer *t, int delay);
 
 #endif
 
