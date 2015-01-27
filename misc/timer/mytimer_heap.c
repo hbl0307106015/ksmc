@@ -1,10 +1,5 @@
 #include"mytimer_heap.h"
 
-bool mytimer_heap_is_empty()
-{
-	return ((gTimer_heap.cur_size) <= 0);
-}
-
 void mytimer_heap_init(int cap)
 {
 	if(cap < 0) {
@@ -128,15 +123,7 @@ void mytimer_heap_pop()
 	if (gTimer_heap.timer_array[0]) {
 		free(gTimer_heap.timer_array[0]);
 		gTimer_heap.timer_array[0] = gTimer_heap.timer_array[--(gTimer_heap.cur_size)];
-		#if 0
-		if (gTimer_heap.cur_size > 1) {
-			gTimer_heap.timer_array[0] = gTimer_heap.timer_array[--(gTimer_heap.cur_size)];
-			free(gTimer_heap.timer_array[--(gTimer_heap.cur_size)]);
-			mytimer_heap_percolate_down(0);
-		} else if (gTimer_heap.cur_size == 1) {
-			free(gTimer_heap.timer_array[--(gTimer_heap.cur_size)]);
-		}
-		#endif
+		mytimer_heap_percolate_down(0);
 	}
 }
 
@@ -169,7 +156,7 @@ static void mytimer_heap_percolate_down(int hole)
 	}
 	
 	if (gTimer_heap.cur_size < 2) {
-		fprintf(stderr, "error: percolate cur_size < 2\n");
+		fprintf(stderr, "warning: percolate cur_size < 2\n");
 		return;
 	}
 	

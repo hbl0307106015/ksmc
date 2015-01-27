@@ -12,7 +12,10 @@ struct mytimer_heap {
 
 extern struct mytimer_heap gTimer_heap;
 
-bool mytimer_heap_is_empty();
+static inline bool mytimer_heap_is_empty()
+{
+	return ((gTimer_heap.cur_size) <= 0);
+}
 
 void mytimer_heap_init(int cap);
 

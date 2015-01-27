@@ -10,7 +10,8 @@ struct mytimer {
 	struct client_data *user_data;
 };
 
-extern struct mytimer **gTimer;
+extern struct mytimer **gTimer; /* gTimer does not allocated memory space */
+extern struct mytimer *gTimer_array[]; /* gTimer_array[] has allocated memory space */
 
 void mytimer_init(struct mytimer *t, int delay);
 

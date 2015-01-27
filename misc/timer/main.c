@@ -3,56 +3,50 @@
 #include "mytimer_heap.h"
 
 
-struct mytimer **gTimer;
+struct mytimer **gTimer;// for method 1
+struct mytimer *gTimer_array[]; // for method 2
 struct mytimer_heap gTimer_heap;
 
 void timeout_cb_func(struct client_data *arg);
 
 int main(int argc, char *argv[])
 {
-	/* init timer */
+	#if 1
+	/* method 1: start with existed array */
 	int i;
 	gTimer = (struct mytimer *)malloc(sizeof(struct mytimer *) * 3);
 	for (i = 0; i < 3; i++) {
 		gTimer[i] = malloc(sizeof(struct mytimer));
 		memset(gTimer[i], 0, sizeof(struct mytimer));
 	}
-
-	#if 1
+	
 	gTimer[0]->cb_func = timeout_cb_func;
 	gTimer[1]->cb_func = timeout_cb_func;
 	gTimer[2]->cb_func = timeout_cb_func;
 	mytimer_init(gTimer[0], 1);
 	mytimer_init(gTimer[1], 12);
 	mytimer_init(gTimer[2], 6);
-	#endif
 	
-	/* init heap */
-	/* 1 : start from scratch */
 	mytimer_heap_init_by_array(gTimer, 3, 6);
+	#endif
 	
 	#if 0
-	gTimer_heap.timer_array[0]->cb_func = timeout_cb_func;
-	gTimer_heap.timer_array[1]->cb_func = timeout_cb_func;
-	gTimer_heap.timer_array[2]->cb_func = timeout_cb_func;
-	mytimer_init(gTimer_heap.timer_array[0], 10);
-	mytimer_init(gTimer_heap.timer_array[1], 20);
-	mytimer_init(gTimer_heap.timer_array[2], 30);
-	#endif
-
-	/* add timer */
-	#if 0
-	mytimer_heap_add(&gTimer[0]);
-	mytimer_heap_add(&gTimer[1]);
-	mytimer_heap_add(&gTimer[2]);
-	#endif
-
-	/* 2 : start by existed array-gTimer */
-
+	/* method 2: start from scratch */
+	mytimer_heap_init(6);
 	
-
+	int i;
+	for (i = 0; i < 6; i++) {
+		gTimer_array[i] = malloc(sizeof(struct mytimer));
+		memset(gTimer_array[i], 0, sizeof(struct mytimer));
+		
+		gTimer_array[i]->cb_func = timeout_cb_func;
+		mytimer_init(gTimer_array[i], (i + 1) * 2);
+		
+		mytimer_heap_add(gTimer_array[i]);
+	}
+	#endif
 	
-	/* wait for a moment */
+	/* the main loop */
 	time_t interval = 0;
 	struct mytimer *t = NULL;
 	while (!mytimer_heap_is_empty())
