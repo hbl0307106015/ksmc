@@ -19,6 +19,4 @@ struct client_data {
 	struct mytimer *ptr_timer;
 };
 
-
-
 #endif

@@ -100,6 +100,7 @@ void mytimer_heap_del(struct mytimer *t)
 		return;
 	}
 	
+	t->valid = false;
 	t->cb_func == NULL;
 }
 

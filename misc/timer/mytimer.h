@@ -5,6 +5,7 @@
 #include"common.h"
 
 struct mytimer {
+	bool valid;
 	time_t expire;
 	void (*cb_func)(struct client_data *);
 	struct client_data *user_data;
@@ -15,5 +16,9 @@ extern struct mytimer *gTimer_array[]; /* gTimer_array[] has allocated memory sp
 
 void mytimer_init(struct mytimer *t, int delay);
 
-#endif
+static inline bool is_timer_valid(struct mytimer *t)
+{
+	return (t->valid == true);
+}
 
+#endif

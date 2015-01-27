@@ -14,8 +14,8 @@ int main(int argc, char *argv[])
 	#if 1
 	/* method 1: start with existed array */
 	int i;
-	gTimer = (struct mytimer *)malloc(sizeof(struct mytimer *) * 3);
-	for (i = 0; i < 3; i++) {
+	gTimer = (struct mytimer *)malloc(sizeof(struct mytimer *) * 6);
+	for (i = 0; i < 6; i++) {
 		gTimer[i] = malloc(sizeof(struct mytimer));
 		memset(gTimer[i], 0, sizeof(struct mytimer));
 	}
@@ -26,8 +26,11 @@ int main(int argc, char *argv[])
 	mytimer_init(gTimer[0], 1);
 	mytimer_init(gTimer[1], 12);
 	mytimer_init(gTimer[2], 6);
+	mytimer_init(gTimer[3], 8);
+	mytimer_init(gTimer[4], 9);
+	mytimer_init(gTimer[5], 21);
 	
-	mytimer_heap_init_by_array(gTimer, 3, 6);
+	mytimer_heap_init_by_array(gTimer, 6, 6);
 	#endif
 	
 	#if 0
@@ -46,6 +49,10 @@ int main(int argc, char *argv[])
 	}
 	#endif
 	
+	/* test the invalid item */
+	gTimer[3]->valid = false;
+	gTimer[5]->valid = false;
+	
 	/* the main loop */
 	time_t interval = 0;
 	struct mytimer *t = NULL;
@@ -53,8 +60,14 @@ int main(int argc, char *argv[])
 	{
 		t = mytimer_heap_top();
 		if (!t) {
-			fprintf(stdout, "heap is empty now");
+			fprintf(stdout, "heap is empty now\n");
 			break;
+		}
+		
+		if (!is_timer_valid(t)) {
+			mytimer_heap_pop();
+			fprintf(stdout, "timer is invalid\n");
+			continue;
 		}
 		
 		interval = t->expire - time(NULL);
