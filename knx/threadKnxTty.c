@@ -41,6 +41,20 @@ void* handle_knx_tty(void *arg)
     tv.tv_usec = 0;
     #endif
     
+    struct pkt_t *pkt = NULL;
+    struct circular_queue *txq = NULL, *rxq = NULL;
+    txq = knx_protocol_get_queue_tx();
+	if (!txq) {
+		fprintf(stderr, "%s %d get tx queue failed\n", __func__, __LINE__);
+		goto out;
+	}
+	
+    rxq = knx_protocol_get_queue_rx();
+	if (!rxq) {
+		fprintf(stderr, "%s %d get rx queue failed\n", __func__, __LINE__);
+		goto out;
+	}
+	
     while (gFlagExit != true) {
 	//while (1) {
            
@@ -50,9 +64,22 @@ void* handle_knx_tty(void *arg)
 		FD_SET(tty_fd, &tty_set);
 
         if (gNetworkRole) {
-            //fprintf(stdout, "try to write data, result:");
+            fprintf(stdout, "try to write data, result:");
+            #if 0
             ret = write(tty_fd, buffer, 21);
             fprintf(stdout, "r = %d bytes\n", ret);
+            #endif
+            
+            /* retrieve a packet from tx queue */
+			pthread_mutex_lock(&(txq->qmutex));
+			pkt = (struct pkt_t *)knx_protocol_retrieve_packet(txq);
+			pthread_mutex_unlock(&(txq->qmutex));
+			
+			if (pkt && pkt->u) {
+				/* send the packet to the tty_fd if packet(s) exist */
+				ret = write(tty_fd, pkt->u, pkt->length);
+			}
+
             sleep(3);
         } else {
             //fprintf(stdout, "try to read data, result:");
@@ -92,9 +119,17 @@ void* handle_knx_tty(void *arg)
 						//usleep((unsigned int)(180 + (590 * 3 * frame_length) + 900));
 						actual_len = read(tty_fd, buffer_r, frame_length);
 						fprintf(stdout, "NO = %d, actual_length := %02x ", (++nr), actual_len);
-						if (frame_length == actual_len)
+						if (frame_length == actual_len) {
 							finished = 1;
-						else {
+							pkt = knx_protocol_alloc_pkt(actual_len);
+							knx_protocol_pkt_fill(pkt, buffer_r, actual_len);
+							fprintf(stdout, "enqueuing a packet, len=%d\n", (int)pkt->length);
+							/* put the packet to the rx queue */
+							pthread_mutex_lock(&(rxq->qmutex));
+							//enqueue(rxq, pkt);
+							knx_protocol_store_packet(rxq, (void *)pkt);
+							pthread_mutex_unlock(&(rxq->qmutex));
+						} else {
 							failed++;
 							dump_buffer(buffer_r, actual_len);
 							fprintf(stdout, "\n");
@@ -108,15 +143,17 @@ void* handle_knx_tty(void *arg)
 			} /* FD is set */
 
 			if (finished) {
+				//fprintf(stdout, "threadknxtty received finished: ");
 				//dump_buffer(buffer_r, frame_length);
-				dump_buffer_appl_data(buffer_r, frame_length, DUMP_FORMAT_STRING);
+				//dump_buffer_appl_data(buffer_r, frame_length, DUMP_FORMAT_STRING);
 				finished = 0;
 			}
 			
         } /* role == 0 */
         
     } /* while (running) */
-    
+
+out:
     fprintf(stdout, "thread %u is going to shutdown\n", ((unsigned int)pthread_self()));
 	return (void *)NULL;
 }

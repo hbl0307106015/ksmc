@@ -89,9 +89,12 @@ void circular_queue_show(const struct circular_queue *que)
 		qsize = (que->rear - que->front + MAX_QUEUE_SIZE) % MAX_QUEUE_SIZE;
 	#endif
 	
+	#if 0
 	for (i = 0; i < qsize; i++) {
 		fprintf(stdout, "q[%d]=%d\t",\
-			i, ((struct data*)(que->q[(que->front + i) % MAX_QUEUE_SIZE]))->val);
+			i, que->q[(que->front + i) % MAX_QUEUE_SIZE]->val);
 	}
+	#endif
+
 	putc('\n', stdout);
 }

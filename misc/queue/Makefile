@@ -3,7 +3,7 @@
 
 CC=gcc
 CFLAGS=-Wall -W -O -g
-LDFLAGS=
+LDFLAGS=-lpthread
 INCLUDES=-I.
 
 TARGET=queue

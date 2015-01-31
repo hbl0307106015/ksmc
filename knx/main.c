@@ -2,10 +2,12 @@
 #include "knxProtocol.h"
 #include "threadKnxTty.h"
 #include "threadSocket.h"
+#include "circularQueue.h"
+#include "timerHeap.h"
 #include "log.h"
 
 /* marcos */
-#define VERSION_STR "0.0.2"
+#define VERSION_STR "0.3.0"
 #define KNX_THREAD_NUM 2
 
 /* global variables */
@@ -13,6 +15,8 @@ bool gEnableRssi = false;
 bool gFlagExit = false;
 uint8_t gNetworkRole = 0;
 uint16_t gTxInterval = 0;
+
+struct timer_heap gTimer_heap;
 
 pthread_t thread_manager[KNX_THREAD_NUM];
 
@@ -23,6 +27,7 @@ extern int getopt(int argc, char * const argv[], const char *optstring);
 extern int sigaction(int s, __const struct sigaction *sg, struct sigaction *osg);
 extern int sigemptyset(sigset_t *s);
 #endif
+
 
 void* handle_knx_tty(void *arg);
 void* handle_socket(void *arg);
@@ -76,6 +81,25 @@ static void program_init(char **dev,
     int i;
     for (i = 0; i < KNX_THREAD_NUM; i++)
 		memset(&(thread_manager[i]), 0, sizeof(pthread_t));
+	
+	// init the timer heap
+	timer_heap_init(DEFAULT_TIMER_HEAP_SIZE);
+	
+	int ret = 0;
+
+	ret = knx_protocol_init_queue_tx();
+	if (ret < 0) {
+		fprintf(stderr, "%s %d init tx queue failed\n", __func__, __LINE__);
+		exit(0);
+	} else
+		fprintf(stdout, "txq init successfully\n");
+
+	ret = knx_protocol_init_queue_rx();
+	if (ret < 0) {
+		fprintf(stderr, "%s %d init rx queue failed\n", __func__, __LINE__);
+		exit(0);
+	} else
+		fprintf(stdout, "rxq init successfully\n");
 }
 
 static void sighandler(int signum)
@@ -156,7 +180,7 @@ int main(int argc, char *argv[])
 	int tty_fd = open(dev, O_RDWR|O_NOCTTY|O_NDELAY);
 	if (tty_fd < 0) {
 		perror("open file");
-		exit(1);
+		goto out;
 	}
 
 	/* fill out new termios struct and apply it */
@@ -168,13 +192,13 @@ int main(int argc, char *argv[])
 	/* restore the status of UART device, i.e. to the block-status(default) */
 	if (fcntl(tty_fd, F_SETFL, 0) < 0) {
 		perror("fcntl set flag");
-		exit(1);
+		goto out;
 	}
 	
 	/* to verify whether the fd is ready for a terminal */
 	if (isatty(tty_fd) == 0) {
 		perror("this is not a terminal device");
-		exit(1);
+		goto out;
 	}
 	
 	struct sigaction sigact;
@@ -193,7 +217,7 @@ int main(int argc, char *argv[])
 	ret = pthread_create(&tkt, NULL, handle_knx_tty, (void *)&tkp);
 	if (ret != 0) {
 		fprintf(stderr, "thread knx failed...\n");
-		exit(1);
+		goto out;
 	}
 	thread_manager[0] = tkt;
 	
@@ -205,7 +229,7 @@ int main(int argc, char *argv[])
 	ret = pthread_create(&tsk, NULL, handle_socket, (void *)&tsp);
 	if (ret != 0) {
 		fprintf(stderr, "thread socket failed...\n");
-		exit(1);
+		goto out;
 	}
 	thread_manager[1] = tsk;
 	#endif
@@ -215,9 +239,11 @@ int main(int argc, char *argv[])
 	
 	pthread_join(tkt, NULL);
 	pthread_join(tsk, NULL);
-    fprintf(stdout, "shuting down smc...\n");
+    fprintf(stdout, "shuting down knx...\n");
 
 out:
+	knx_protocol_deinit_queue_rx();
+	knx_protocol_deinit_queue_tx();
 	if (tty_fd >= 0)
 		close(tty_fd);
     return 0;

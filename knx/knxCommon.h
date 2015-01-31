@@ -23,6 +23,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include <time.h> // for time_t and time()
+
 #include <termios.h>
 #include <fcntl.h>
 
@@ -38,6 +40,13 @@ extern int usleep (__useconds_t __useconds);
 #else
 extern int usleep(unsigned long usec);
 #endif /* __USE_BSD */
+
+#define BYTES32 32
+#define BYTES64 64
+#define BYTES128 128
+#define BYTES256 256
+
+#define BUFFER_SIZE64 BYTES64
 
 /* transfer data type for baud rate */
 static inline speed_t transfer_baud_rate(uint16_t int_baud_rate)

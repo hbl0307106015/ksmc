@@ -21,4 +21,4 @@ $(TARGET) : $(OBJECT_FILES)
 
 .PHONY : clean
 clean:
-	$(RM) $(TARGET) $(OBJECT_FILES)
+	$(RM) $(TARGET) $(OBJECT_FILES) *~

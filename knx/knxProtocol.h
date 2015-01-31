@@ -2,12 +2,13 @@
 #define __KNX_PROTOCOL_H__
 
 #include "knxCommon.h"
+#include "circularQueue.h"
 
 /* global variables */
 extern uint16_t gTxInterval;
 
 /* Macro */
-#define VERSION_STR "0.0.2"
+#define VERSION_STR "0.3.0"
 
 #define GET_OFFSET_RECV_C(b) (b + 0)
 #define GET_OFFSET_RECV_HEADER(b) (b + 1)
@@ -22,7 +23,7 @@ extern uint16_t gTxInterval;
 #define LENGTH_BEFORE_APPL_DATA 17
 #define LENGTH_RSSI_INFO 1
 
-#define RC1180_MAX_BUFFER_SIZE 64
+#define RC1180_MAX_BUFFER_SIZE BUFFER_SIZE64
 
 /* KNX1 Timing Table 
  * Note:(KNX2 has all of the features of KNX1 inaddition to 
@@ -33,7 +34,17 @@ extern uint16_t gTxInterval;
 #define TIME_TXD	590
 #define TIME_TXD_IDLE	900
 
+#define TIME_PACKET_TIMEOUT_2s 2000000
+#define TIME_RXD_CTS 20
+#define TIME_RXD_TX 960
+#define TIME_TX 3600
+#define TIME_TX_IDLE 960
 
+// knx packet type
+struct pkt_t {
+	uint8_t *u; /* content of the buffer */
+	size_t length; /* length of the buffer */
+};
 
 /* network role enumeration */
 enum {
@@ -43,32 +54,36 @@ enum {
 } network_role;
 
 /* functions */
+struct pkt_t* knx_protocol_alloc_pkt(size_t len);
 
 /* transfer data type for baud rate */
-static inline uint16_t transfer_wait_time(speed_t spd, int char_len)
-{
-	switch(spd)
-	{
-		case B9600:
-			return (TIME_RX_TXD + (TIME_TXD * 3 * char_len) + TIME_TXD_IDLE);
-			break;
-		case B19200:
-			return (TIME_RX_TXD + ((TIME_TXD + 70) * char_len) + TIME_TXD_IDLE);
-			break;
-		default:
-			return (TIME_RX_TXD + (TIME_TXD * char_len) + TIME_TXD_IDLE);
-			break;
-	}
-}
+uint16_t transfer_wait_time(speed_t spd, int char_len);
 
 /* return actual user data length */
-static inline uint16_t get_user_data_length(uint16_t total_len)
-{
-	if (total_len < 1)
-		return 0;
-	if (gEnableRssi)
-		return total_len - LENGTH_BEFORE_APPL_DATA - LENGTH_RSSI_INFO;;
-	return total_len - LENGTH_BEFORE_APPL_DATA;
-}
+uint16_t get_user_data_length(uint16_t total_len);
+
+/* get queue object */
+struct circular_queue* knx_protocol_get_queue_rx();
+
+struct circular_queue* knx_protocol_get_queue_tx();
+
+// init queue
+int knx_protocol_init_queue_tx();
+int knx_protocol_init_queue_rx();
+int knx_protocol_init_queue(struct circular_queue **que);
+
+// deinit queue
+void knx_protocol_deinit_queue_tx();
+void knx_protocol_deinit_queue_rx();
+void knx_protocol_deinit_queue(struct circular_queue **que);
+
+// fill out the packet type structure
+int knx_protocol_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len);
+
+//store a packet to the queue
+int knx_protocol_store_packet(struct circular_queue *que, void *d);
+
+// retrieve a packet from the queue
+void* knx_protocol_retrieve_packet(struct circular_queue *que);
 
 #endif /* __KNX_PROTOCOL_H__ */

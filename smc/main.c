@@ -1,9 +1,10 @@
-#include"smcCommon.h"
-#include"pratical.h"
+#include "smcCommon.h"
+#include "smcProtocol.h"
+#include "threadKNX.h"
+#include "pratical.h"
+#include "log.h"
 
 #define VERSION_STR "0.0.1"
-#define MAX_STRING_LENGTH 255
-#define MAX_UDP_PAYLOAD_SIZE 65507
 
 volatile bool gDoExit = false;
 
@@ -41,7 +42,7 @@ static void sighandler(int signum)
 
 int main(int argc, char *argv[])
 {
-	int c = 0;
+	int c = 0, ret = 0;
 	bool daemonize = false;
 	char *str_service = NULL;
 
@@ -109,36 +110,23 @@ int main(int argc, char *argv[])
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGQUIT, &sigact, NULL);
 	
-	gDoExit = false;
-	struct sockaddr_storage clntAddr; //client address
-	socklen_t clntAddrLen = sizeof(clntAddr); // length of client address structure, (in-out parameter)
-	unsigned char buffer[MAX_STRING_LENGTH] = {0}; // I/O buffer
-	ssize_t numBytesRcvd = 0;
-	ssize_t numBytesSent = 0;
+	pthread_t tknx;
+	struct thread_knx_arg knx_arg;
+	knx_arg.sock = sock;
+	knx_arg.real_time_info = get_real_time_info(INFO_NR_KNX);
+	ret = pthread_create(&tknx, NULL, smc_thread_knx, (void *)&knx_arg);
+	if (ret != 0) {
+		fprintf(stderr, "thread knx failed...\n");
+		goto out;
+	}
 	
-	do {
-		
-		numBytesRcvd = recvfrom(sock, buffer, MAX_STRING_LENGTH, \
-			0, (struct sockaddr *)&clntAddr, &clntAddrLen);
-		if (numBytesRcvd < 0)
-			DieWithSystemMessage("recvfrom() failed");
-		
-		fputs("Handling client ", stdout);
-		PrintSocketAddress((struct sockaddr *) &clntAddr, stdout);
-		fputc('\n', stdout);
-		
-		//send received datagram back to the client
-		numBytesSent = sendto(sock, buffer, numBytesRcvd, \
-			0, (struct sockaddr *)&clntAddr, sizeof(clntAddr));
-		if (numBytesSent < 0)
-			DieWithSystemMessage("sendto() failed");
-		else if (numBytesSent != numBytesRcvd)
-			DieWithUserMessage("sento()", "sent unexpected number of bytes");
-
-	} while (gDoExit != true);
+	fprintf(stdout, "thread knx:%u\n", ((unsigned int)tknx));
 	
-	// NOT REACHED except for (Ctrl-C)
-	fputs("shuting down...\n", stdout);
+	pthread_join(tknx, NULL);
+	
+	//NOT REACHED except for (Ctrl-C)
+out:
+	fputs("shuting down smc...\n", stdout);
 	close(sock);
     return 0;
 }

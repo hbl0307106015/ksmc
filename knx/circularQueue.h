@@ -1,4 +1,7 @@
-#include "common.h"
+#ifndef __CIRCULAR_QUEUE_H__
+#define __CIRCULAR_QUEUE_H__
+
+#include "knxCommon.h"
 
 #define MAX_QUEUE_SIZE 8
 
@@ -9,6 +12,8 @@ struct circular_queue {
 	uint8_t tag;
 	pthread_mutex_t qmutex;
 };
+
+//typedef circular_queue_t (struct circular_queue *);
 
 enum {
 	QUEUE_EMPTY = 0,
@@ -42,3 +47,5 @@ bool enqueue(struct circular_queue *q, void *d);
 void* dequeue(struct circular_queue *q);
 
 void circular_queue_show(const struct circular_queue *q);
+
+#endif /* __CIRCULAR_QUEUE_H__ */

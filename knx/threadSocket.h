@@ -12,4 +12,9 @@ struct thread_socket_arg {
 	char *server; // server address/name
 };
 
+static inline bool is_sock_addr_equal()
+{
+	return true;
+}
+
 #endif /* __THREAD_SOCKET_H__ */
