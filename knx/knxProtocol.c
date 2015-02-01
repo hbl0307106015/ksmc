@@ -1,5 +1,6 @@
 #include "knxProtocol.h"
 #include "knxCommon.h"
+#include "circularQueue.h"
 
 static struct circular_queue *gKNXRxQueue = NULL;
 static struct circular_queue *gKNXTxQueue = NULL;
@@ -164,3 +165,54 @@ void* knx_protocol_retrieve_packet(struct circular_queue *que)
 	void *p = dequeue(que);
 	return p;
 }
+
+#if 0
+void handle_smc_packet(unsigned char *b, size_t len)
+{
+	/* show the received packet */
+	dump_buffer(b, len);
+	
+	/* retrieve the header */
+	size_t offset = 0;
+	struct smc_proto_header *sh = (struct smc_header *)b;
+	switch (sh->type)
+	{
+		case SMC_PROTO_KNX_SAMPLE:
+			offset = sizeof(struct smc_proto_header);
+			handle_smc_knx_sample(b + offset, len - offset);
+			break;
+		default:
+			fprintf(stderr, "%s %d, unknown packet type\n", __func__, __LINE__);
+			break;
+	}
+	
+	/* add it to the txqueue */
+}
+
+void handle_smc_packet_sample(unsigned char *b, size_t len)
+{
+	if (!b) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	
+	struct circular_queue *txq = NULL;
+	txq = knx_protocol_get_queue_tx();
+	if (!txq) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	
+	struct pkt_t *p = (struct pkt_t *)malloc(sizeof(struct pkt_t));
+	if (!p) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	
+	memcpy(p->u, b, len);
+	p->length = len;
+	pthread_mutex_lock(&(txq->qmutex));
+	knx_protocol_store_packet(que, (void *)p);
+	pthread_mutex_unlock(&(txq->qmutex));
+}
+#endif

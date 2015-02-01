@@ -127,6 +127,7 @@ void timer_heap_pop()
 	}
 	
 	if (gTimer_heap.timer_array[0]) {
+		free(gTimer_heap.timer_array[0]->user_data);
 		free(gTimer_heap.timer_array[0]);
 		gTimer_heap.timer_array[0] = gTimer_heap.timer_array[--(gTimer_heap.cur_size)];
 		timer_heap_percolate_down(0);

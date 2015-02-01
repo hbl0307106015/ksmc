@@ -21,3 +21,20 @@ static void knx_timer_init(struct knx_timer *t, int delay)
 	
 	t->valid = true;
 }
+
+struct knx_timer* knx_timer_alloc(size_t size)
+{
+	if (size <= 0)
+		goto out;
+
+	struct knx_timer *new_timer = (struct knx_timer *)malloc(size);
+
+	if (!new_timer) {
+		fprintf(stderr, "%s %d, memory out\n", __func__, __LINE__);
+		goto out;
+	}
+	
+	return new_timer;
+out:
+	return NULL;
+}

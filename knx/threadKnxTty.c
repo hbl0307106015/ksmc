@@ -19,7 +19,7 @@ void* handle_knx_tty(void *arg)
     int i;
     for (i = 0; i < 22; i++)
 		fprintf(stdout, "%02x ", buffer[i]);
-	fprintf(stdout, "\n");
+	fputc('\n');
 	fflush(stdout);
     
     #if 0

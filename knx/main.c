@@ -13,6 +13,7 @@
 /* global variables */
 bool gEnableRssi = false;
 bool gFlagExit = false;
+uint8_t gKNXState = KNX_STATE_UNALIVE;
 uint8_t gNetworkRole = 0;
 uint16_t gTxInterval = 0;
 

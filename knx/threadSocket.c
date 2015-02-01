@@ -7,7 +7,7 @@
 #define MAX_NUM_FILES_DES 2
 #define POLL_TIME_OUT_MS 500
 
-void handle_smc_packet(unsigned char *b, size_t len);
+
 
 void* handle_socket(void *arg)
 {
@@ -80,6 +80,16 @@ void* handle_socket(void *arg)
 		goto out;
 	}
 	
+	/* put a discovery request packet to the rxq queue
+	 * the connection for knx and smc is begin with a discovery 
+	 * request from knx.
+	*/
+	struct pkt_t *discovery_req = NULL;
+	discovery_resp = (struct pkt_t *)malloc(sizeof(struct pkt_t));
+	// assemble a discovery packet
+	knx_protocol_assemble_discovery_req(&discovery_req);
+	knx_protocol_store_packet(rxq, &discovery_req); //put the packet to rxq queue
+	
 	struct pkt_t *pkt = NULL;
 	struct pollfd fds[MAX_NUM_FILES_DES];
 	fds[0].fd = sock; // add socket file descriptor
@@ -121,6 +131,22 @@ void* handle_socket(void *arg)
 				} else if ((size_t)numBytes != pkt->length) {
 					perror("socket thread, numBytes != eStrLen");
 					//pthread_exit(NULL);
+				} else if(pkt->type & PACKET_RESPONSE_NEEDED) {
+					fputs("init pkt dada for timer\n", stdout);
+					// copy pkt structure to user data
+					struct pkt_t *udata = knx_protocol_alloc_pkt(sizeof(uint16_t));
+					memcpy(udata, pkt, sizeof(pkt));
+					memcpy(udata->u, pkt->u, pkt->length);
+					struct knx_timer *discovery_timer = knx_timer_alloc(sizeof(struct knx_timer));
+					// cb_func
+					discovery_timer->valid = true;
+					discovery_timer->expire = 3; //3 second for timeout
+					discovery_timer->user_data = udata;
+					discovery_timer->cb_func = timeout_cb_func_discovery_req;
+					
+					// add timer for it
+					fputs("add pkt dada to timer\n", stdout);
+					timer_heap_add(discovery_timer);
 				}
 				
 				free(pkt->u);
@@ -149,7 +175,8 @@ void* handle_socket(void *arg)
 				perror("socket thread, addr is not equal with the previous server");
 			
 			/* handle the packet accroding to the packet type */
-			handle_smc_packet((unsigned char *)buffer, numBytes);
+			//handle_smc_packet((unsigned char *)buffer, numBytes);
+			smc_knx_handle_protocol();
 			
 			/*
 			numBytes = recvfrom(sock, buffer, MAX_STRING_LENGTH, 0, \
@@ -180,53 +207,4 @@ out:
 	freeaddrinfo(servAddr);
 	close(sock);
     return ((void *)NULL);
-}
-
-void handle_smc_packet(unsigned char *b, size_t len)
-{
-	/* show the received packet */
-	dump_buffer(b, len);
-	
-	/* retrieve the header */
-	size_t offset = 0;
-	struct smc_proto_header *sh = (struct smc_header *)b;
-	switch (sh->type)
-	{
-		case SMC_PROTO_KNX_SAMPLE:
-			offset = sizeof(struct smc_proto_header);
-			handle_smc_knx_sample(b + offset, len - offset);
-			break;
-		default:
-			fprintf(stderr, "%s %d, unknown packet type\n", __func__, __LINE__);
-			break;
-	}
-	
-	/* add it to the txqueue */
-}
-
-void handle_smc_packet_sample(unsigned char *b, size_t len)
-{
-	if (!b) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return;
-	}
-	
-	struct circular_queue *txq = NULL;
-	txq = knx_protocol_get_queue_tx();
-	if (!txq) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return;
-	}
-	
-	struct pkt_t *p = (struct pkt_t *)malloc(sizeof(struct pkt_t));
-	if (!p) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return;
-	}
-	
-	memcpy(p->u, b, len);
-	p->length = len;
-	pthread_mutex_lock(&(txq->qmutex));
-	knx_protocol_store_packet(que, (void *)p);
-	pthread_mutex_unlock(&(txq->qmutex));
 }

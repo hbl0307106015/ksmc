@@ -1,13 +1,13 @@
 #ifndef __SMCPROTOCOL_H__
 #define __SMCPROTOCOL_H__
 
-#define SMC_PROTO_KNX_SAMPLE		0x0A
-#define SMC_PROTO_KNX_DO_A_TEST		0x0B
-#define SMC_PROTO_KNX_DISCOV		0x0C
-
-struct smc_proto_header {
-	uint8_t type; /* packet type */
-	uint8_t *u; /* content */
+struct protocol_data {
+	int fd; // socket file descriptor
+	int flags; // flags, mostly is 0
+	struct sockaddr *src_addr; //socket address structure
+	socklen_t src_addr_len; // socket address length
+	void *buffer; // I/O buffer, unsigned char* or uint8*
+	size_t buffer_len; // length of the I/O buffer
 };
 
 #define KNX_PROTO_DISCOVERY_REQUEST 0x1000

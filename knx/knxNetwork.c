@@ -2,33 +2,33 @@
 #include "knxNetwork.h"
 #include "knxProtocol.h"
 
-void smc_store_raw_bytes(uint8_t **b, const uint8_t *r, const size_t len)
+void knx_store_raw_bytes(uint8_t **b, const uint8_t *r, const size_t len)
 {
 	memcpy((*b), r, len);
 	(*b) += len;
 }
 
-void smc_store_bytes8(uint8_t **b, uint8_t c)
+void knx_store_bytes8(uint8_t **b, uint8_t c)
 {
 	memcpy(*b, &c, 1);
 	(*b) += 1;
 }
 
-void smc_store_bytes16(uint8_t **b, uint16_t c)
+void knx_store_bytes16(uint8_t **b, uint16_t c)
 {
 	c = htons(c);
 	memcpy(*b, &c, 2);
 	(*b) += 2;
 }
 
-void smc_store_bytes32(uint8_t **b, uint32_t c)
+void knx_store_bytes32(uint8_t **b, uint32_t c)
 {
 	c = htonl(c);
 	memcpy(*b, &c, 4);
 	(*b) += 4;
 }
 
-uint8_t* smc_retrieve_raw_bytes(uint8_t **b, const size_t len)
+uint8_t* knx_retrieve_raw_bytes(uint8_t **b, const size_t len)
 {
 	uint8_t *v = NULL;
 	v = (uint8_t *)malloc(len);
@@ -41,7 +41,7 @@ out:
 	return NULL;
 }
 
-uint8_t smc_retrieve_bytes8(uint8_t **b)
+uint8_t knx_retrieve_bytes8(uint8_t **b)
 {
 	uint8_t u;
 	memcpy(&u, *b, 1);
@@ -49,7 +49,7 @@ uint8_t smc_retrieve_bytes8(uint8_t **b)
 	return u;
 }
 
-uint16_t smc_retrieve_bytes16(uint8_t **b)
+uint16_t knx_retrieve_bytes16(uint8_t **b)
 {
 	uint16_t u;
 	memcpy(&u, *b, 2);
@@ -57,7 +57,7 @@ uint16_t smc_retrieve_bytes16(uint8_t **b)
 	return ntohs(u);
 }
 
-uint32_t smc_retrieve_bytes32(uint8_t **b)
+uint32_t knx_retrieve_bytes32(uint8_t **b)
 {
 	uint32_t u;
 	memcpy(&u, *b, 4);
@@ -65,12 +65,12 @@ uint32_t smc_retrieve_bytes32(uint8_t **b)
 	return ntohl(u);
 }
 
-uint16_t smc_retrieve_header(uint8_t **b)
+uint16_t knx_retrieve_header(uint8_t **b)
 {
-	return smc_retrieve_bytes16(b);
+	return knx_retrieve_bytes16(b);
 }
 
-ssize_t smc_send_protocol(struct protocol_data *p)
+ssize_t smc_knx_send_protocol(struct protocol_data *p)
 {
 	return sendto(p->fd, p->buffer, p->buffer_len, \
 		p->flags, p->src_addr, p->src_addr_len);
@@ -83,25 +83,25 @@ ssize_t smc_knx_send_discovery_resp(struct protocol_data *p)
 	uint8_t *b = buffer;
 	
 	//header 2 bytes
-	smc_store_bytes16(&b, KNX_PROTO_DISCOVERY_RESPONSE);
+	knx_store_bytes16(&b, KNX_PROTO_DISCOVERY_RESPONSE);
 	p->buffer = buffer;
 	
 	//send response
-	return smc_send_protocol(p);
+	return knx_send_protocol(p);
 }
 
 void smc_knx_handle_protocol(struct protocol_data *p)
 {
 	uint16_t header_type;
 	uint8_t *b = (uint8_t *)p->buffer;
-	header_type = smc_retrieve_header(&b);
+	header_type = knx_retrieve_header(&b);
 	
 	switch(header_type)
 	{
 		case KNX_PROTO_DISCOVERY_REQUEST:
-			smc_knx_handle_discovery(p);
+			knx_handle_discovery(p);
 		case KNX_PROTO_STANDARD_PACKET:
-			smc_knx_handle_standard_packet(p);
+			knx_handle_standard_packet(p);
 		default:
 			fprintf(stderr, "%s %d, unknown packet type\n", __func__, __LINE__);
 			break;
@@ -113,7 +113,7 @@ void smc_knx_handle_discovery(struct protocol_data *p)
 	fprintf(stdout, "received a discovery packet\n");
 	int ret;
 	
-	ret = smc_knx_send_discovery_resp(p);
+	ret = knx_send_discovery_resp(p);
 	fprintf(stdout, "send a discovery response len=%d\n", ret);
 		
 	//set the state of knx client as alive
@@ -130,4 +130,51 @@ void smc_knx_handle_standard_packet(struct protocol_data *p)
 	 dump_buffer((unsigned char *)p->buffer, p->buffer_len);
 }
 
+// assemble a discovery request packet
+void smc_knx_protocol_assemble_discovery_req(struct pkt_t *p)
+{
+	if (!p) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	
+	uint8_t *b = p->u;
+	knx_store_bytes16(&b, KNX_PROTO_DISCOVERY_REQUEST);
+	p->type = PACKET_TYPE_SOCKET|PACKET_RESPONSE_NEEDED;
+	p->length = sizeof(uint16_t);
+}
+
+void cb_func_discovery_req_timeout(void *d)
+{
+	if (!d) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	
+	//add the packet to rxq
+	struct circular_queue *rxq = NULL;
+	rxq = knx_protocol_get_queue_rx();
+	if (!rxq) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	//re-add the timer to timer_heap
+	struct knx_timer *t = knx_timer_alloc(sizeof(struct knx_timer));
+	if (!t) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		return;
+	}
+	
+	struct pkt_t *pkt = (struct pkt_t *)d;
+	struct pkt_t *udata = knx_protocol_alloc_pkt(sizeof(uint16_t));
+	memcpy(udata, pkt, sizeof(pkt));
+	memcpy(udata->u, pkt->u, pkt->length);
+	
+	t->valid = true;
+	t->expire = 3; //3 second for timeout
+	t->user_data = udata;
+	t->cb_func = timeout_cb_func_discovery_req;
+	fprintf(stdout, "re-add %04x to timer_heap\n", *((uint16_t *)pkt->u));
+	timer_heap_add(t);
+}
 

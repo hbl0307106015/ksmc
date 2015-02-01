@@ -40,10 +40,17 @@ extern uint16_t gTxInterval;
 #define TIME_TX 3600
 #define TIME_TX_IDLE 960
 
+#define PACKET_TYPE_KNX 0x01
+#define PACKET_TYPE_SOCKET 0x02
+#define PACKET_RESPONSE_NEEDED 0x04
+
 // knx packet type
 struct pkt_t {
-	uint8_t *u; /* content of the buffer */
-	size_t length; /* length of the buffer */
+	uint8_t type; /* type of the packet, e.g. knx packet or socket packet, 
+	whether response is needed */
+	
+	uint8_t *u; // content of the buffer
+	size_t length; // length of the buffer
 };
 
 /* network role enumeration */
@@ -52,6 +59,14 @@ enum {
     ROLE_RECEIVER,
     ROLE_TRANSMITTER_RECEIVER,
 } network_role;
+
+enum {
+	KNX_STATE_UNALIVE,
+	KNX_STATE_ALIVE,
+	KNX_STATE_MAX,
+}
+
+extern uint8_t gKNXState;
 
 /* functions */
 struct pkt_t* knx_protocol_alloc_pkt(size_t len);
@@ -85,5 +100,7 @@ int knx_protocol_store_packet(struct circular_queue *que, void *d);
 
 // retrieve a packet from the queue
 void* knx_protocol_retrieve_packet(struct circular_queue *que);
+
+
 
 #endif /* __KNX_PROTOCOL_H__ */

@@ -23,4 +23,6 @@ static inline bool is_timer_valid(struct knx_timer *t)
 	return (t->valid == true);
 }
 
+struct knx_timer* knx_timer_alloc(size_t size);
+
 #endif /* __KNX_TIMER_H__ */
