@@ -1,6 +1,7 @@
 #include "smcCommon.h"
 #include "smcProtocol.h"
 #include "threadKNX.h"
+#include "threadAPP.h"
 #include "pratical.h"
 #include "log.h"
 
@@ -110,19 +111,32 @@ int main(int argc, char *argv[])
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGQUIT, &sigact, NULL);
 	
-	pthread_t tknx;
+	#if 0
+	pthread_t tKNX;
 	struct thread_knx_arg knx_arg;
 	knx_arg.sock = sock;
 	knx_arg.real_time_info = get_real_time_info(INFO_NR_KNX);
-	ret = pthread_create(&tknx, NULL, smc_thread_knx, (void *)&knx_arg);
+	ret = pthread_create(&tKNX, NULL, smc_thread_knx, (void *)&knx_arg);
 	if (ret != 0) {
 		fprintf(stderr, "thread knx failed...\n");
 		goto out;
 	}
+	#endif
 	
-	fprintf(stdout, "thread knx:%u\n", ((unsigned int)tknx));
+	pthread_t tAPP;
+	struct thread_app_arg app_arg;
+	app_arg.sock = sock;
+	ret = pthread_create(&tAPP, NULL, smc_thread_app, (void *)&app_arg);
+	if (ret != 0) {
+		fprintf(stderr, "thread knx failed...\n");
+		goto out;
+	}
+	//app_arg.real_time_info = get_real_time_info(INFO_NR_APP);
+	//fprintf(stdout, "thread knx:%u\n", ((unsigned int)tKNX));
+	fprintf(stdout, "thread app:%u\n", ((unsigned int)tAPP));
 	
-	pthread_join(tknx, NULL);
+	//pthread_join(tKNX, NULL);
+	pthread_join(tAPP, NULL);
 	
 	//NOT REACHED except for (Ctrl-C)
 out:

@@ -1,6 +1,6 @@
+#include "log.h"
 #include "knxCommon.h"
 #include "knxProtocol.h"
-#include "log.h"
 #include "threadKnxTty.h"
 
 void* handle_knx_tty(void *arg)
@@ -19,27 +19,19 @@ void* handle_knx_tty(void *arg)
     int i;
     for (i = 0; i < 22; i++)
 		fprintf(stdout, "%02x ", buffer[i]);
-	fputc('\n');
-	fflush(stdout);
-    
-    #if 0
-    sigset_t mask;
-    sigfillset(&mask);
-    pthread_sigmask(SIG_BLOCK, &mask, NULL);
-    #endif
+	fputc('\n', stdout);
+	//fflush(stdout);
     
 	fd_set tty_set;
-    //bool running = true;
     int tty_fd = knx_arg->fd;
     int ret = 0, frame_length = 0, failed = 0;
     int maxDescriptor = tty_fd + 1, \
 		actual_len = 0, finished = 0, nr = 0;
 	speed_t spd_baud_rate = knx_arg->baud_rate;
-	#if 1
+	
     struct timeval tv;
     tv.tv_sec = 1;
     tv.tv_usec = 0;
-    #endif
     
     struct pkt_t *pkt = NULL;
     struct circular_queue *txq = NULL, *rxq = NULL;
@@ -55,10 +47,15 @@ void* handle_knx_tty(void *arg)
 		goto out;
 	}
 	
+	fputs("create thread knxtty successfully\n", stdout);
+	
     while (gFlagExit != true) {
-	//while (1) {
-           
-		//fprintf(stdout, "enter poll\n");
+		
+		if (gServerInfo[INFO_NR_SMC].state != STATE_ALIVE) {
+			fprintf(stdout, "smc is not alive\n");
+			sleep(1);
+			continue;
+		}
 		
 		FD_ZERO(&tty_set);
 		FD_SET(tty_fd, &tty_set);
@@ -70,13 +67,13 @@ void* handle_knx_tty(void *arg)
             fprintf(stdout, "r = %d bytes\n", ret);
             #endif
             
-            /* retrieve a packet from tx queue */
+            // retrieve a packet from tx queue
 			pthread_mutex_lock(&(txq->qmutex));
 			pkt = (struct pkt_t *)knx_protocol_retrieve_packet(txq);
 			pthread_mutex_unlock(&(txq->qmutex));
 			
 			if (pkt && pkt->u) {
-				/* send the packet to the tty_fd if packet(s) exist */
+				// send the packet to the tty_fd if packet(s) exist
 				ret = write(tty_fd, pkt->u, pkt->length);
 			}
 

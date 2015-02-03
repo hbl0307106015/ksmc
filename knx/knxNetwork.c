@@ -1,6 +1,8 @@
 #include "log.h"
+#include "timerHeap.h"
+#include "knxTimer.h"
 #include "knxNetwork.h"
-#include "knxProtocol.h"
+
 
 void knx_store_raw_bytes(uint8_t **b, const uint8_t *r, const size_t len)
 {
@@ -87,37 +89,19 @@ ssize_t smc_knx_send_discovery_resp(struct protocol_data *p)
 	p->buffer = buffer;
 	
 	//send response
-	return knx_send_protocol(p);
+	return smc_knx_send_protocol(p);
 }
 
-void smc_knx_handle_protocol(struct protocol_data *p)
+void smc_knx_handle_discovery_resp(struct protocol_data *p)
 {
-	uint16_t header_type;
-	uint8_t *b = (uint8_t *)p->buffer;
-	header_type = knx_retrieve_header(&b);
+	fprintf(stdout, "received a discovery response packet\n");
+	//int ret;
 	
-	switch(header_type)
-	{
-		case KNX_PROTO_DISCOVERY_REQUEST:
-			knx_handle_discovery(p);
-		case KNX_PROTO_STANDARD_PACKET:
-			knx_handle_standard_packet(p);
-		default:
-			fprintf(stderr, "%s %d, unknown packet type\n", __func__, __LINE__);
-			break;
-	}
-}
-
-void smc_knx_handle_discovery(struct protocol_data *p)
-{
-	fprintf(stdout, "received a discovery packet\n");
-	int ret;
-	
-	ret = knx_send_discovery_resp(p);
-	fprintf(stdout, "send a discovery response len=%d\n", ret);
+	//ret = knx_send_discovery_resp(p);
+	//fprintf(stdout, "send a discovery response len=%d\n", ret);
 		
 	//set the state of knx client as alive
-	set_real_time_info(p, INFO_NR_KNX, CLIENT_STATE_ALIVE);
+	set_real_time_info(p, INFO_NR_SMC, STATE_ALIVE);
 }
 
 void smc_knx_handle_standard_packet(struct protocol_data *p)
@@ -138,34 +122,65 @@ void smc_knx_protocol_assemble_discovery_req(struct pkt_t *p)
 		return;
 	}
 	
+	fprintf(stdout, "%s %d, assembling discovery request...\n", __func__, __LINE__);
 	uint8_t *b = p->u;
 	knx_store_bytes16(&b, KNX_PROTO_DISCOVERY_REQUEST);
 	p->type = PACKET_TYPE_SOCKET|PACKET_RESPONSE_NEEDED;
 	p->length = sizeof(uint16_t);
+	fprintf(stdout, "%s %d, discovery request assembled...\n", __func__, __LINE__);
 }
 
-void cb_func_discovery_req_timeout(void *d)
+void smc_knx_handle_protocol(struct protocol_data *p)
+{
+	uint16_t header_type;
+	uint8_t *b = (uint8_t *)p->buffer;
+	header_type = knx_retrieve_header(&b);
+	
+	switch(header_type)
+	{
+		case KNX_PROTO_DISCOVERY_RESPONSE:
+			smc_knx_handle_discovery_resp(p);
+		case KNX_PROTO_STANDARD_PACKET:
+			smc_knx_handle_standard_packet(p);
+		default:
+			fprintf(stderr, "%s %d, unknown packet type\n", __func__, __LINE__);
+			break;
+	}
+}
+
+void timeout_cb_func_discovery_req(void *d)
 {
 	if (!d) {
 		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return;
+		goto out;
 	}
 	
+	struct client_real_time_info *rp = get_real_time_info(INFO_NR_SMC);
+	if (rp->state == STATE_ALIVE) {
+		fprintf(stderr, "%s %d, client state is already alive\n", __func__, __LINE__);
+		goto out;	
+	}
+	
+	struct pkt_t *pkt = (struct pkt_t *)d;
 	//add the packet to rxq
 	struct circular_queue *rxq = NULL;
 	rxq = knx_protocol_get_queue_rx();
 	if (!rxq) {
 		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return;
+		goto out;
 	}
+	
+	pthread_mutex_lock(&(rxq->qmutex));
+	knx_protocol_store_packet(rxq, (void *)pkt);
+	pthread_mutex_unlock(&(rxq->qmutex));
+	
 	//re-add the timer to timer_heap
 	struct knx_timer *t = knx_timer_alloc(sizeof(struct knx_timer));
 	if (!t) {
 		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return;
+		goto out;
 	}
-	
-	struct pkt_t *pkt = (struct pkt_t *)d;
+
 	struct pkt_t *udata = knx_protocol_alloc_pkt(sizeof(uint16_t));
 	memcpy(udata, pkt, sizeof(pkt));
 	memcpy(udata->u, pkt->u, pkt->length);
@@ -176,5 +191,8 @@ void cb_func_discovery_req_timeout(void *d)
 	t->cb_func = timeout_cb_func_discovery_req;
 	fprintf(stdout, "re-add %04x to timer_heap\n", *((uint16_t *)pkt->u));
 	timer_heap_add(t);
+	
+out:
+	return;
 }
 

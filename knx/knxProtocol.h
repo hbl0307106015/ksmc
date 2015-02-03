@@ -3,6 +3,7 @@
 
 #include "knxCommon.h"
 #include "circularQueue.h"
+#include "smcProtocol.h"
 
 /* global variables */
 extern uint16_t gTxInterval;
@@ -61,15 +62,18 @@ enum {
 } network_role;
 
 enum {
-	KNX_STATE_UNALIVE,
-	KNX_STATE_ALIVE,
-	KNX_STATE_MAX,
-}
+	INFO_NR_SMC = 0,
+	INFO_NR_MAX,
+};
 
-extern uint8_t gKNXState;
+enum {
+	STATE_UNALIVE = 0,
+	STATE_ALIVE,
+	STATE_MAX,
+};
 
 /* functions */
-struct pkt_t* knx_protocol_alloc_pkt(size_t len);
+
 
 /* transfer data type for baud rate */
 uint16_t transfer_wait_time(speed_t spd, int char_len);
@@ -91,6 +95,9 @@ int knx_protocol_init_queue(struct circular_queue **que);
 void knx_protocol_deinit_queue_tx();
 void knx_protocol_deinit_queue_rx();
 void knx_protocol_deinit_queue(struct circular_queue **que);
+
+
+struct pkt_t* knx_protocol_alloc_pkt(size_t len);
 
 // fill out the packet type structure
 int knx_protocol_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len);

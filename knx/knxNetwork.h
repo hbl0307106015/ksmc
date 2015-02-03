@@ -3,6 +3,7 @@
 
 #include "knxCommon.h"
 #include "knxProtocol.h"
+#include "smcProtocol.h"
 
 /* Macros */
 #define THREAD_RETURN_TYPE void*
@@ -24,10 +25,9 @@ ssize_t smc_knx_send_protocol(struct protocol_data *p);
 
 ssize_t smc_knx_send_discovery_resp(struct protocol_data *p);
 
-
-void smc_knx_handle_protocol(struct protocol_data *p);
 void smc_knx_handle_discovery(struct protocol_data *p);
 void smc_knx_handle_standard_packet(struct protocol_data *p);
+void smc_knx_handle_protocol(struct protocol_data *p);
 
 void smc_knx_protocol_assemble_discovery_req(struct pkt_t *p);
 void timeout_cb_func_discovery_req(void *d);

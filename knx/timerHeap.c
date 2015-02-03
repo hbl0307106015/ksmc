@@ -106,13 +106,13 @@ void timer_heap_del(struct knx_timer *t)
 	}
 	
 	t->valid = false;
-	t->cb_func == NULL;
+	t->cb_func = NULL;
 }
 
-struct knx_timer* mytimer_heap_top()
+struct knx_timer* timer_heap_top()
 {
 	if (timer_heap_is_empty()) {
-		fprintf(stderr, "error: top t==empty\n");
+		fprintf(stderr, "%s, %d, error: top t==empty\n", __func__, __LINE__);
 		return NULL;
 	}
 	
@@ -122,7 +122,7 @@ struct knx_timer* mytimer_heap_top()
 void timer_heap_pop()
 {
 	if (timer_heap_is_empty()) {
-		fprintf(stderr, "error: top t==empty\n");
+		fprintf(stderr, "%s, %d, error: top t==empty\n", __func__, __LINE__);
 		return;
 	}
 	

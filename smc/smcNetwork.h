@@ -22,15 +22,19 @@ uint8_t smc_retrieve_bytes8(uint8_t **buffer);
 uint16_t smc_retrieve_bytes16(uint8_t **buffer);
 uint32_t smc_retrieve_bytes32(uint8_t **buffer);
 
-uint16_t smc_retrieve_header(uint8_t **b);
 
+
+
+uint16_t smc_retrieve_header(uint8_t **b);
 ssize_t smc_send_protocol(struct protocol_data *p);
 
 ssize_t smc_knx_send_discovery_resp(struct protocol_data *p);
-
-
 void smc_knx_handle_protocol(struct protocol_data *p);
 void smc_knx_handle_discovery(struct protocol_data *p);
 void smc_knx_handle_standard_packet(struct protocol_data *p);
+
+
+
+void smc_app_handle_protocol(struct protocol_data *p);
 
 #endif /* __SMC_NETWORK_H__ */

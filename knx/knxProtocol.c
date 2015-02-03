@@ -1,9 +1,16 @@
+#include "timerHeap.h"
 #include "knxProtocol.h"
-#include "knxCommon.h"
-#include "circularQueue.h"
+
 
 static struct circular_queue *gKNXRxQueue = NULL;
 static struct circular_queue *gKNXTxQueue = NULL;
+
+
+struct client_real_time_info gServerInfo[MAX_CLIENT_CLASS] = {
+	[INFO_NR_SMC] = {
+		.state = STATE_UNALIVE,
+	}
+};
 
 /* functions */
 struct pkt_t* knx_protocol_alloc_pkt(size_t len)

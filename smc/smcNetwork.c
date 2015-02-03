@@ -1,4 +1,5 @@
 #include "log.h"
+#include "pratical.h"
 #include "smcNetwork.h"
 #include "smcProtocol.h"
 
@@ -130,4 +131,20 @@ void smc_knx_handle_standard_packet(struct protocol_data *p)
 	 dump_buffer((unsigned char *)p->buffer, p->buffer_len);
 }
 
+void smc_app_handle_protocol(struct protocol_data *p)
+{
+	if (!p) {
+		fprintf(stdout, "%s %d, null pointer", __func__, __LINE__);
+		goto out;
+	}
 
+	//print sockaddr info
+	fputs("Handling client ", stdout);
+	PrintSocketAddress(p->src_addr, stdout);
+	fputc('\n', stdout);
+
+	dump_buffer((unsigned char *)p->buffer, p->buffer_len);
+	
+out:
+	return;
+}
