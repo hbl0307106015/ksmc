@@ -1,15 +1,45 @@
 #include "log.h"
 #include "threadKNX.h"
-#include "pratical.h"
+#include "smcQueue.h"
 #include "smcCommon.h"
 #include "smcNetwork.h"
 #include "smcProtocol.h"
 
 void* smc_thread_knx(void *arg)
 {
-	struct thread_knx_arg *knx_arg = (struct thread_knx_arg *)arg;
-	struct client_real_time_info *real_time_info = knx_arg->real_time_info;
+	//struct thread_knx_arg *knx_arg = (struct thread_knx_arg *)arg;
+	//struct peer_real_time_info *knx_client_info = knx_arg->knx_client_info;
 
+	// tell the system what kind(s) of address we want
+	struct addrinfo addrCriteria;
+	memset(&addrCriteria, 0, sizeof(addrCriteria));
+	addrCriteria.ai_family = AF_UNSPEC; // any address family
+	addrCriteria.ai_flags = AI_PASSIVE; // accept on any address / port
+	addrCriteria.ai_socktype = SOCK_DGRAM; // only datagram socket
+	addrCriteria.ai_protocol = IPPROTO_UDP; // only UDP socket
+
+	// get address(es)
+	int sock = 0;
+	struct addrinfo *servAddr = NULL;
+	int ret = getaddrinfo(NULL, PORT_NUM_KNX, &addrCriteria, &servAddr);
+	if (ret != 0) {
+		DieWithUserMessage("thread knx, getaddrinfo() failed", gai_strerror(ret));
+		goto out;
+	}
+
+	// create socket file descriptor
+	sock = socket(servAddr->ai_family, servAddr->ai_socktype,\
+		servAddr->ai_protocol);
+	if (sock < 0) {
+		DieWithSystemMessage("thread knx, socket() failed");
+		goto out;
+	}
+
+	if (bind(sock, servAddr->ai_addr, servAddr->ai_addrlen) < 0) {
+		DieWithSystemMessage("thread knx, bind() failed");
+		goto out;
+	}
+	
 	struct sockaddr_storage clntAddr; //client address
 	socklen_t clntAddrLen = sizeof(clntAddr); // length of client address structure, (in-out parameter)
 	unsigned char buffer[RC1180_MAX_BUFFER_SIZE] = {0}; // I/O buffer
@@ -18,10 +48,10 @@ void* smc_thread_knx(void *arg)
 	
 	size_t cnt = 0;
 	struct pollfd fds[MAX_NUM_POLL_FILES_DES];
-	fds[0].fd = knx_arg->sock; // add socket file descriptor
-	fds[0].events = POLLIN|POLLRDNORM;// |POLLOUT|POLLWRNORM; // register pollin & pollout event
-	fds[1].fd = knx_arg->sock; // add socket file descriptor
-	fds[1].events = POLLOUT|POLLWRNORM; // register pollin & pollout event
+	fds[0].fd = sock; // add socket file descriptor
+	fds[0].events = POLLIN|POLLRDNORM;// register pollin event
+	fds[1].fd = sock; // add socket file descriptor
+	fds[1].events = POLLOUT|POLLWRNORM; // register pollout event
 	
 	struct protocol_data pdata;
 	struct client_real_time_info *rt_info = NULL;
@@ -30,19 +60,20 @@ void* smc_thread_knx(void *arg)
 		0x0, 0x1, 0x0, 0x2, 0x61, 0x0, 0x0, \
 		'h', 'e', 'l', 'l', 'o', ',', 'w', 'o', 'r', 'l', 'd','!'};
 
+	fputs("thread knx enter mainloop\n", stdout);
 	do {
-		
+		// check if fds are ready ?
 		if (poll(fds, MAX_NUM_POLL_FILES_DES, POLL_TIME_OUT_MS) <= 0) {
 			perror("no file descriptor is available");
 			goto next_turn;
 		}
 
 		// check readable availability
-		if ((fds[0].revents && POLLIN)||(fds[0].revents && POLLRDNORM)) {
+		if ((fds[0].revents & POLLIN)||(fds[0].revents & POLLRDNORM)) {
 			fputs("pollin available\n", stdout);
 			
 			//read socket
-			numBytesRcvd = recvfrom(knx_arg->sock, buffer, RC1180_MAX_BUFFER_SIZE, \
+			numBytesRcvd = recvfrom(sock, buffer, RC1180_MAX_BUFFER_SIZE, \
 				0, (struct sockaddr *)&clntAddr, &clntAddrLen);
 			if (numBytesRcvd < 0)
 				DieWithSystemMessage("recvfrom() failed");
@@ -57,10 +88,9 @@ void* smc_thread_knx(void *arg)
 			dump_buffer((unsigned char *)buffer, (size_t)numBytesRcvd);
 			
 			//parse buffer
-			//smc_knx_parse(buffer, numBytesRcvd);
-			pdata.fd = knx_arg->sock;
-			pdata.src_addr = (struct sockaddr *)&clntAddr;
-			pdata.src_addr_len = clntAddrLen;
+			pdata.network_ctx.fd = sock;
+			pdata.network_ctx.src_addr = (struct sockaddr *)&clntAddr;
+			pdata.network_ctx.src_addr_len = clntAddrLen;
 			pdata.buffer = buffer;
 			pdata.buffer_len = numBytesRcvd;
 			smc_knx_handle_protocol(&pdata);
@@ -69,6 +99,7 @@ void* smc_thread_knx(void *arg)
 		}
 		
 		// check writable availability
+		#if 0
 		if ((fds[1].revents && POLLOUT)||(fds[1].revents && POLLWRNORM)) {
 			
 			if (real_time_info[INFO_NR_KNX].state != CLIENT_STATE_ALIVE) {
@@ -102,11 +133,21 @@ void* smc_thread_knx(void *arg)
 				DieWithUserMessage("sento()", "sent unexpected number of bytes");
 			fputs("pollout done\n", stdout);
 		}
+		#endif
 
-next_turn:
-		sleep(1);
+		next_turn:
+			sleep(1);
+			continue;
 
 	} while (gDoExit != true);
-	
-	return (void *)NULL;
+
+out:
+	fprintf(stdout, "thread %u is going to shutdown\n",  ((unsigned int)pthread_self()));
+	fflush(stdout);
+	fflush(stderr);
+	smc_deinit_queue_by_index(QUEUE_INDEX_TX_KNX);
+	// free address list which allocated by getaddrinfo()
+	freeaddrinfo(servAddr);
+	close(sock);
+	return ((void *)NULL);
 }

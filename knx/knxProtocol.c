@@ -1,10 +1,9 @@
-#include "knxProtocol.h"
 #include "knxCommon.h"
+#include "knxNetwork.h"
+#include "knxProtocol.h"
+#include "smcProtocol.h"
 
-static struct circular_queue *gKNXRxQueue = NULL;
-static struct circular_queue *gKNXTxQueue = NULL;
-
-/* functions */
+// functions
 struct pkt_t* knx_protocol_alloc_pkt(size_t len)
 {
 	if (len <= 0)
@@ -14,7 +13,7 @@ struct pkt_t* knx_protocol_alloc_pkt(size_t len)
 	if (!p)
 		goto out;
 	
-	/* allocate the buffer for $len size */
+	// allocate the buffer for $len size
 	p->u = (uint8_t *)malloc(len);
 	p->length = len;
 	
@@ -26,7 +25,29 @@ out:
 	return NULL;
 }
 
-/* transfer data type for baud rate */
+// fill out the packet type structure
+int knx_protocol_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len)
+{
+	if (!p || !b) {
+		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
+		goto out;
+	}
+	
+	if (len <= 0) {
+		fprintf(stderr, "%s %d, len <= 0\n", __func__, __LINE__);
+		goto out;
+	}
+	
+	uint8_t *buffer = p->u;
+	knx_store_header(&buffer, SMC_KNX_PACKET_TYPE);
+	memcpy(buffer, b, len);
+	p->length = len + sizeof(uint16_t);
+	return 0;
+out:
+	return -1;
+}
+
+// transfer data type for baud rate
 uint16_t transfer_wait_time(speed_t spd, int char_len)
 {
 	switch(spd)
@@ -43,7 +64,7 @@ uint16_t transfer_wait_time(speed_t spd, int char_len)
 	}
 }
 
-/* return actual user data length */
+// return actual user data length
 uint16_t get_user_data_length(uint16_t total_len)
 {
 	if (total_len < 1)
@@ -53,114 +74,25 @@ uint16_t get_user_data_length(uint16_t total_len)
 	return total_len - LENGTH_BEFORE_APPL_DATA;
 }
 
-/* get queue object */
-struct circular_queue* knx_protocol_get_queue_rx()
+// store a packet to the queue
+int knx_protocol_store_packet(struct circular_queue **que, void *d)
 {
-	return gKNXRxQueue;
-}
-
-struct circular_queue* knx_protocol_get_queue_tx()
-{
-	return gKNXTxQueue;
-}
-
-// init queue
-int knx_protocol_init_queue_tx()
-{
-	return knx_protocol_init_queue(&gKNXTxQueue);
-}
-
-int knx_protocol_init_queue_rx()
-{
-	return knx_protocol_init_queue(&gKNXRxQueue);
-}
-
-int knx_protocol_init_queue(struct circular_queue **que)
-{	
-	if (((*que) = circular_queue_init()))
-		return 0;
-
-	fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-	return -1;
-}
-
-// deinit queue
-void knx_protocol_deinit_queue_tx()
-{
-	return knx_protocol_deinit_queue(&gKNXTxQueue);
-}
-
-void knx_protocol_deinit_queue_rx()
-{
-	return knx_protocol_deinit_queue(&gKNXRxQueue);
-}
-
-void knx_protocol_deinit_queue(struct circular_queue **que)
-{
-	if (!(*que)) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		goto out;
-	}
-	
-	/* release the element if exist */
-	if (is_queue_empty(*que))
-		goto out;
-
-	uint16_t i = 0, qsize = get_queue_size(*que);
-
-	do {
-		free((*que)->q[((*que)->front + i) % MAX_QUEUE_SIZE]);
-	} while (++i < qsize);
-
-	/* free the queue */
-	circular_queue_destroy(*que);
-
-out:
-	return;
-}
-
-// fill out the packet type structure
-int knx_protocol_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len)
-{
-	if (!p || !b) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		goto out;
-	}
-	
-	if (len <= 0) {
-		fprintf(stderr, "%s %d, len <= 0\n", __func__, __LINE__);
-		goto out;
-	}
-	
-	memcpy(p->u, b, len);
-	p->length = len;
-	return 0;
-out:
-	return -1;
-}
-
-//store a packet to the queue
-int knx_protocol_store_packet(struct circular_queue *que, void *d)
-{
-	if ((!que) || (!d)) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return -1;
-	}
-
-	if (enqueue(que, d))
-		return 0;
-
-	return -1;
+	return knx_enqueue(*que, d);
 }
 
 // retrieve a packet from the queue
-void* knx_protocol_retrieve_packet(struct circular_queue *que)
+void* knx_protocol_retrieve_packet(struct circular_queue **que)
 {
-	if (!que) {
-		fprintf(stderr, "%s %d, null pointer\n", __func__, __LINE__);
-		return NULL;
-	}
-	
-	void *p = dequeue(que);
-	return p;
+	return knx_dequeue(*que);
+}
+
+
+uint16_t knx_retrieve_header(uint8_t **b)
+{
+	return knx_retrieve_bytes16(b);
+}
+
+void knx_store_header(uint8_t **b, uint16_t t)
+{
+	return knx_store_bytes16(b, t);
 }

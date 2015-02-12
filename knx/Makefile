@@ -2,7 +2,7 @@
 # VIA Networking <2014.12>
 
 CC=gcc
-CFLAGS=-Wall -W -O -DUSE_POSIX=1
+CFLAGS=-Wall -W -O -g -DUSE_POSIX=1
 LDFLAGS=-lpthread
 INCLUDES=-I.
 

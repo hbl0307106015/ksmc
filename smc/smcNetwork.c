@@ -1,6 +1,6 @@
 #include "log.h"
 #include "smcNetwork.h"
-#include "smcProtocol.h"
+#include "smcQueue.h"
 
 void smc_store_raw_bytes(uint8_t **b, const uint8_t *r, const size_t len)
 {
@@ -65,69 +65,75 @@ uint32_t smc_retrieve_bytes32(uint8_t **b)
 	return ntohl(u);
 }
 
-uint16_t smc_retrieve_header(uint8_t **b)
+void PrintSocketAddress(const struct sockaddr *addr, FILE *s)
 {
-	return smc_retrieve_bytes16(b);
-}
-
-ssize_t smc_send_protocol(struct protocol_data *p)
-{
-	return sendto(p->fd, p->buffer, p->buffer_len, \
-		p->flags, p->src_addr, p->src_addr_len);
-}
-
-ssize_t smc_knx_send_discovery_resp(struct protocol_data *p)
-{
-	// send discovery response
-	uint8_t buffer[BUFFER_SIZE64] = {0};
-	uint8_t *b = buffer;
+	//test for address and stream
+	if (addr == NULL || s == NULL)
+		goto out;
 	
-	//header 2 bytes
-	smc_store_bytes16(&b, KNX_PROTO_DISCOVERY_RESPONSE);
-	p->buffer = buffer;
+	void *numericAddress = NULL;
+	char addrBuffer[INET6_ADDRSTRLEN] = {0};// buffer to contain result (IPv6 sufficient to hold IPv4)
+	in_port_t port; // port to print
 	
-	//send response
-	return smc_send_protocol(p);
-}
-
-void smc_knx_handle_protocol(struct protocol_data *p)
-{
-	uint16_t header_type;
-	uint8_t *b = (uint8_t *)p->buffer;
-	header_type = smc_retrieve_header(&b);
-	
-	switch(header_type)
+	//set pointer to address based on address family
+	switch (addr->sa_family)
 	{
-		case KNX_PROTO_DISCOVERY_REQUEST:
-			smc_knx_handle_discovery(p);
-		case KNX_PROTO_STANDARD_PACKET:
-			smc_knx_handle_standard_packet(p);
-		default:
-			fprintf(stderr, "%s %d, unknown packet type\n", __func__, __LINE__);
+		case AF_INET:
+			numericAddress = &(((struct sockaddr_in *)addr)->sin_addr);
+			port = ntohs(((struct sockaddr_in *)addr)->sin_port);
 			break;
-	}
-}
-
-void smc_knx_handle_discovery(struct protocol_data *p)
-{
-	fprintf(stdout, "received a discovery packet\n");
-	int ret;
+		case AF_INET6:
+			numericAddress = &(((struct sockaddr_in6 *)addr)->sin6_addr);
+			port = ntohs(((struct sockaddr_in6 *)addr)->sin6_port);
+			break;
+		default:
+			fputs("unknown sockaddr * address type\n", s);
+			goto out;
+	} //switch
 	
-	ret = smc_knx_send_discovery_resp(p);
-	fprintf(stdout, "send a discovery response len=%d\n", ret);
-		
-	//set the state of knx client as alive
-	set_real_time_info(p, INFO_NR_KNX, CLIENT_STATE_ALIVE);
+	//convert binary to printable address
+	if (inet_ntop(addr->sa_family, numericAddress, addrBuffer,\
+		sizeof(addrBuffer)) == NULL)
+		fputs("invalid address\n", s);
+	else {
+		fprintf(s, "%s", addrBuffer);
+		if (port != 0) //zero not valid in any socket addr
+			fprintf(s, "-%u", port);
+		else
+			fputs("-port number not valid", s);
+	}
+
+out:
+	return;
 }
 
-void smc_knx_handle_standard_packet(struct protocol_data *p)
+void smc_iface_init()
 {
-	/* just dump it now,
-	 * this packet will add to a queue later, 
-	 * the queue is used for smc & app communication
-	 * */
-	 fprintf(stdout, "received a standard knx packet\n");
-	 dump_buffer((unsigned char *)p->buffer, p->buffer_len);
+    int sock4if = socket(AF_INET, SOCK_DGRAM, 0);
+
+	if (sock4if < 0) {
+		DieWithSystemMessage("thread app, socket 4 if() failed");
+		goto out;
+	}
+	
+	struct ifreq ifr;
+	size_t slen = strlen(gIface);
+	strncpy(ifr.ifr_name, gIface, slen);
+	ifr.ifr_name[slen] = '\0';
+	fprintf(stdout, "interface str=%s strlen=%d\n", ifr.ifr_name, slen);
+	if (ioctl(sock4if, SIOCGIFADDR, &ifr) < 0) {
+		perror("ioctl, get if addr error");
+        close(sock4if);
+		goto out;
+	}
+	
+	struct sockaddr_in gen_addr;
+	memcpy(&gen_addr, &(ifr.ifr_addr), sizeof(gen_addr));
+	gIPstr = inet_ntoa(gen_addr.sin_addr);
+	slen = strlen(gIPstr);
+	fprintf(stdout, "%s-%d\n",  gIPstr, slen);
+
+out:
+    close(sock4if);
+    return;
 }
-
-

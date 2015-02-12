@@ -5,20 +5,19 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
-LIBUSB_DIR := external/libusb-1.0.9
-
-LOCAL_MODULE := smc
+LOCAL_MODULE := knx
 LOCAL_MODULE_TAGS := optional eng
-LOCAL_SRC_FILES := smc.c
+LOCAL_SRC_FILES := main.c \
+	circularQueue.c knxCommon.c knxNetwork.c knxProtocol.c \
+	knxQueue.c log.c threadKnxTty.c threadSocket.c
+	
 
-LOCAL_C_INCLUDES += $(LOCAL_PATH) \
-	$(LIBUSB_DIR) \
-	$(LIBUSB_DIR)/libusb
+LOCAL_C_INCLUDES += $(LOCAL_PATH)
 
-#LOCAL_CFLAGS +=
-#LOCAL_LDLIBS +=
+LOCAL_CFLAGS += -I$(LOCAL_C_INCLUDES)
+LOCAL_LDLIBS += -lpthread
 
-LOCAL_SHARED_LIBRARIES := libc libusb
+LOCAL_SHARED_LIBRARIES := libc
+#LOCAL_SHARED_LIBRARIES := libc libpthread
 #LOCAL_STATIC_LIBRARIES := 
 include $(BUILD_EXECUTABLE)
-

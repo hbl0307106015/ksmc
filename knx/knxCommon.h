@@ -16,12 +16,17 @@
 #include <bits/sigaction.h> // for struct sigaction
 #endif
 */
+#if !defined(__USE_POSIX)
+#include <netinet/in.h>
+typedef __in_port_t in_port_t; /* IP port type */
+#endif /* ANDROID_CHANGES */
 
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <poll.h>
 
 #include <time.h> // for time_t and time()
 
@@ -47,6 +52,9 @@ extern int usleep(unsigned long usec);
 #define BYTES256 256
 
 #define BUFFER_SIZE64 BYTES64
+
+#define MAX_NUM_FILES_DES 2
+#define POLL_TIME_OUT_MS 500
 
 /* transfer data type for baud rate */
 static inline speed_t transfer_baud_rate(uint16_t int_baud_rate)

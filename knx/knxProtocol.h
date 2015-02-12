@@ -2,19 +2,19 @@
 #define __KNX_PROTOCOL_H__
 
 #include "knxCommon.h"
-#include "circularQueue.h"
+#include "knxQueue.h"
 
-/* global variables */
+// global variables
 extern uint16_t gTxInterval;
 
-/* Macro */
+// Macro
 #define VERSION_STR "0.3.0"
 
 #define GET_OFFSET_RECV_C(b) (b + 0)
 #define GET_OFFSET_RECV_HEADER(b) (b + 1)
 #define GET_OFFSET_RECV_RF_INFO(b) (b + 2)
 #define GET_OFFSET_RECV_KNX_CTRL(b) (b + 9)
-//get the offset of TX serial number of Domain Address
+// get the offset of TX serial number of Domain Address
 #define GET_OFFSET_RECV_TXSN_OR_DA(b) (b + 3)
 #define GET_OFFSET_RECV_APPL_HEADER(b) (b + 10)
 #define GET_OFFSET_RECV_SRC(b) GET_OFFSET_RECV_APPL_HEADER(b)
@@ -42,48 +42,37 @@ extern uint16_t gTxInterval;
 
 // knx packet type
 struct pkt_t {
-	uint8_t *u; /* content of the buffer */
-	size_t length; /* length of the buffer */
+	uint8_t *u; // content of the buffer
+	size_t length; // length of the buffer
 };
 
-/* network role enumeration */
+// network role enumeration
 enum {
     ROLE_TRANSMITTER = 0,
     ROLE_RECEIVER,
     ROLE_TRANSMITTER_RECEIVER,
 } network_role;
 
-/* functions */
+// functions
+// allocate a memory for generic packet type structure
 struct pkt_t* knx_protocol_alloc_pkt(size_t len);
-
-/* transfer data type for baud rate */
-uint16_t transfer_wait_time(speed_t spd, int char_len);
-
-/* return actual user data length */
-uint16_t get_user_data_length(uint16_t total_len);
-
-/* get queue object */
-struct circular_queue* knx_protocol_get_queue_rx();
-
-struct circular_queue* knx_protocol_get_queue_tx();
-
-// init queue
-int knx_protocol_init_queue_tx();
-int knx_protocol_init_queue_rx();
-int knx_protocol_init_queue(struct circular_queue **que);
-
-// deinit queue
-void knx_protocol_deinit_queue_tx();
-void knx_protocol_deinit_queue_rx();
-void knx_protocol_deinit_queue(struct circular_queue **que);
 
 // fill out the packet type structure
 int knx_protocol_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len);
 
-//store a packet to the queue
-int knx_protocol_store_packet(struct circular_queue *que, void *d);
+// transfer data type for baud rate
+uint16_t transfer_wait_time(speed_t spd, int char_len);
+
+// return actual user data length
+uint16_t get_user_data_length(uint16_t total_len);
+
+// store a packet to the queue
+int knx_protocol_store_packet(struct circular_queue **que, void *d);
 
 // retrieve a packet from the queue
-void* knx_protocol_retrieve_packet(struct circular_queue *que);
+void* knx_protocol_retrieve_packet(struct circular_queue **que);
+
+uint16_t knx_retrieve_header(uint8_t **b);
+void knx_store_header(uint8_t **b, uint16_t t);
 
 #endif /* __KNX_PROTOCOL_H__ */

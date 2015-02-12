@@ -2,7 +2,6 @@
 #define __THREAD_SOCKET_H__
 
 #include "knxCommon.h"
-#include <poll.h>
 
 #define DEFAULT_SERVER_ADDRESS "127.0.0.1"
 #define MAX_STRING_LENGTH 255

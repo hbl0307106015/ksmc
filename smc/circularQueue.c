@@ -78,7 +78,7 @@ void circular_queue_show(const struct circular_queue *que)
 		fprintf(stdout, "queue show, queue is empty\n");
 		goto out;
 	}
-
+	
 out:
 	return;
 }

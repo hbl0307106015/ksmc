@@ -2,43 +2,27 @@
 #define __SMCPROTOCOL_H__
 
 #include "smcCommon.h"
+#include "smcNetwork.h"
 
 struct protocol_data {
-	int fd; // socket file descriptor
-	int flags; // flags, mostly is 0
-	struct sockaddr *src_addr; //socket address structure
-	socklen_t src_addr_len; // socket address length
+	struct network_ctx_t network_ctx;
 	void *buffer; // I/O buffer, unsigned char* or uint8*
 	size_t buffer_len; // length of the I/O buffer
 };
 
-enum {
-	CLIENT_STATE_UNALIVE,
-	CLIENT_STATE_ALIVE,
-	CLIENT_STATE_MAX
+// generic packet type
+struct pkt_t {
+	uint8_t *u; // content of the buffer
+	size_t length; // length of the buffer
 };
 
-enum {
-	INFO_NR_APP,
-	INFO_NR_KNX,
-	INFO_NR_ZIGBEE,
-	INFO_NR_MAX
-};
+// allocate a packet
+struct pkt_t* smc_pkt_alloc(size_t len);
 
-struct client_real_time_info {
-	struct protocol_data client_info; //client information, including socket fd, addr, buffer, len, etc
-	uint8_t state; //real time state
-};
-
-#define MAX_CLIENT_CLASS 3
-extern struct client_real_time_info gClientInfo[MAX_CLIENT_CLASS];
-
-struct client_real_time_info *get_real_time_info(uint8_t nr);
-int set_real_time_info(struct protocol_data *p, uint8_t nr, uint8_t s);
-int set_real_time_info_state(uint8_t nr, uint8_t s);
+// fill out the packet type structure
+int smc_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len);
 
 /* MACROs for KNX */
-
 #define RC1180_MAX_BUFFER_SIZE BUFFER_SIZE64
 
 /* KNX1 Timing Table 
@@ -57,17 +41,46 @@ int set_real_time_info_state(uint8_t nr, uint8_t s);
 #define TIME_TX_IDLE 960
 
 
-#define KNX_PROTO_DISCOVERY_REQUEST 0x1000
-#define KNX_PROTO_DISCOVERY_RESPONSE 0x1001
-#define KNX_PROTO_STANDARD_PACKET 0x1002
+#define KNX_PROTO_DISCOVERY_REQUEST 0x0001
+#define KNX_PROTO_DISCOVERY_RESPONSE 0x0002
+#define KNX_PROTO_STANDARD_PACKET 0x1000
 
 /* MACROs for ZigBee */
 #define ZIGBEE_PROTO_DISCOVERY_REQUEST 0x6000
 #define ZIGBEE_PROTO_SAMPLE_PACKET 0x6002
+#define ZIGBEE_PROTO_LED_STATE_PACKET 0x2000
+#define ZIGBEE_PROTO_LED_CTL_PACKET 0x2001
 
 
 /* MACROs for APP */
-#define APP_PROTO_DISCOVERY_REQUEST 0xB000
+#define APP_PROTO_DISCOVERY_REQUEST 0x3000
+#define APP_PROTO_DISCOVERY_RESPONSE 0x3001
 #define APP_PROTO_SAMPLE_PACKET 0xB002
+
+
+// functions
+
+ssize_t smc_send_protocol(struct protocol_data *p);
+
+// functions for knx
+ssize_t smc_knx_send_discovery_resp(struct protocol_data *p);
+void smc_knx_handle_protocol(struct protocol_data *p);
+void smc_knx_handle_discovery(struct protocol_data *p);
+void smc_knx_handle_standard_packet(struct protocol_data *p);
+
+// functions for app
+void smc_app_handle_protocol(struct protocol_data *p);
+void smc_app_handle_led_ctl_packet(struct protocol_data *p);
+ssize_t smc_app_transmit_protocol(struct protocol_data *p);
+
+// functions for zigbee
+void smc_zigbee_handle_protocol(struct protocol_data *p);
+void smc_zigbee_handle_led_state(struct protocol_data *p);
+ssize_t smc_zigbee_transmit_protocol(struct protocol_data *p);
+ssize_t smc_zigbee_send_discovery_resp(struct protocol_data *p);
+
+uint16_t smc_retrieve_header(uint8_t **b);
+void smc_store_header(uint8_t **b, uint16_t t);
+
 
 #endif /* __SMCPROTOCOL_H__ */

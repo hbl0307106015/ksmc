@@ -14,11 +14,25 @@
 #include<sys/socket.h>
 #include<arpa/inet.h>
 
+#if defined(__USE_POSIX)
+#include<ifaddrs.h>
+#endif
+
+#include<net/if.h>
+#include<sys/ioctl.h>
+#include<netinet/in.h>
+
 #include<poll.h>
 #include<pthread.h>
 
+extern char *gIface;
+extern char *gIPstr;
 extern volatile bool gDoExit;
 
+
+#if !defined(__USE_POSIX)
+typedef __in_port_t in_port_t; /* IP port type */
+#endif /* ANDROID_CHANGES */
 
 
 
@@ -28,9 +42,7 @@ extern volatile bool gDoExit;
 
 #define MAX_STRING_LENGTH BUFFER_SIZE256
 
-#define MAX_NUM_POLL_FILES_DES 2
-#define POLL_TIME_OUT_MS 500
-#define MAX_UDP_PAYLOAD_SIZE 65507
+
 
 
 

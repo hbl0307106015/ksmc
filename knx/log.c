@@ -1,6 +1,5 @@
 #include "log.h"
 #include "knxCommon.h"
-#include "knxProtocol.h"
 
 void dump_buffer(unsigned char *b, size_t len)
 {

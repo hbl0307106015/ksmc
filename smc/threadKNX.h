@@ -3,7 +3,8 @@
 
 struct thread_knx_arg {
 	int sock; //socket file descriptor
-	struct client_real_time_info *real_time_info; //real time information structure
+	char *str_service;// port or service
+	struct peer_real_time_info *knx_client_info; //real time information structure
 };
 
 void* smc_thread_knx(void *arg);

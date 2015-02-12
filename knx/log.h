@@ -2,6 +2,7 @@
 #define __LOG_H__
 
 #include "knxCommon.h"
+#include "knxProtocol.h"
 
 enum {
 	DUMP_FORMAT_STRING = 0,
