@@ -40,6 +40,9 @@ extern uint16_t gTxInterval;
 #define TIME_TX 3600
 #define TIME_TX_IDLE 960
 
+// the first byte is length of the knx uart buffer
+#define KNX_LENGTH_BYTES 1
+
 // knx packet type
 struct pkt_t {
 	uint8_t *u; // content of the buffer
@@ -55,10 +58,10 @@ enum {
 
 // functions
 // allocate a memory for generic packet type structure
-struct pkt_t* knx_protocol_alloc_pkt(size_t len);
+struct pkt_t* knx_protocol_alloc_pkt(ssize_t len);
 
 // fill out the packet type structure
-int knx_protocol_pkt_fill(struct pkt_t *p, unsigned char *b, size_t len);
+int knx_protocol_fill_pkt(struct pkt_t *p, unsigned char *b, size_t len);
 
 // transfer data type for baud rate
 uint16_t transfer_wait_time(speed_t spd, int char_len);
