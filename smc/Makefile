@@ -1,5 +1,5 @@
 # This Makefile is for smc server
-# VIA Networking 2015
+# Networking 2015
 #
 
 CC=gcc
