@@ -33,7 +33,7 @@ static void show_version(void)
 		"knx v" VERSION_STR "\n"
 		"User space daemon for KNX Devices' management,\n"
 		"KNX relevant device Controller and Manager\n"
-		"Copyright (c) 2014, VIA Networking Division "
+		"Copyright (c) 2014, Networking Division "
 		"and contributors\n");
 }
 
