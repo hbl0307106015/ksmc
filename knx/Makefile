@@ -1,5 +1,5 @@
 # This Makefile is for KNX
-# VIA Networking <2014.12>
+# Networking <2014.12>
 
 CC=gcc
 CFLAGS=-Wall -W -O -DUSE_POSIX=1
