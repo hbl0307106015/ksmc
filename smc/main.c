@@ -15,7 +15,7 @@ static void show_version(void)
 		"smc v" VERSION_STR "\n"
 		"User space daemon for smart controller,\n"
 		"KNX and ZigBee relevant device Controller and Manager\n"
-		"Copyright (c) 2014, VIA Networking "
+		"Copyright (c) 2014, Networking "
 		"and contributors\n");
 }
 
