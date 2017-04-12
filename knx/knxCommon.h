@@ -35,7 +35,7 @@ extern bool gFlagExit;
 extern uint8_t gNetworkRole;
 
 #if (defined __USE_XOPEN_EXTENDED && !defined __USE_XOPEN2K8) \
-    || defined __USE_BSD
+    || defined __USE_MISC
 extern int usleep (__useconds_t __useconds);
 #else
 extern int usleep(unsigned long usec);
